@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createCanvas } from 'canvas';
+import { createCanvas, Image as CanvasImage } from 'canvas';
 import {
   samplePixel,
   generateCircles,
@@ -80,8 +80,6 @@ describe('generateHalftone (full pipeline)', () => {
     // Create a fake HTMLImageElement-like object with canvas data
     const dataUrl = (canvas as any).toDataURL();
 
-    // We need to use node-canvas's Image to load the data URL
-    const { Image: CanvasImage } = require('canvas');
     const img = new CanvasImage();
     img.src = dataUrl;
 
@@ -110,7 +108,6 @@ describe('generateHalftone (full pipeline)', () => {
     (ctx as any).fillStyle = '#ffffff';
     (ctx as any).fillRect(0, 0, 10, 10);
 
-    const { Image: CanvasImage } = require('canvas');
     const img = new CanvasImage();
     img.src = (canvas as any).toDataURL();
 
