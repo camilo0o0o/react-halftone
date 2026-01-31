@@ -10,9 +10,17 @@
   "peerDependencies": {
     "react": ">=18.0.0"
   },
+  "scripts": {
+    "test": "vitest"
+  },
   "devDependencies": {
     "@types/react": "^18.0.0",
-    "typescript": "^5.0.0"
+    "@types/react-dom": "^18.3.7",
+    "canvas": "^3.2.1",
+    "jsdom": "^27.4.0",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   },
   "license": "MIT"
 }
