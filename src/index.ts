@@ -1,2 +1,3 @@
 export { Halftone } from './Halftone';
-export type { HalftoneProps, HalftoneConfig } from './types';
+export { useHalftone } from './useHalftone';
+export type { HalftoneProps, HalftoneConfig, Circle, UseHalftoneResult } from './types';

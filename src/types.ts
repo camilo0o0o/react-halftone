@@ -90,3 +90,16 @@ export interface DisplayDimensions {
   /** Display height */
   height: number;
 }
+
+/**
+ * Return type for the useHalftone hook
+ */
+export interface UseHalftoneResult {
+  loading: boolean;
+  error: Error | null;
+  circles: Circle[] | null;
+  pathData: string | null;
+  naturalWidth: number | null;
+  naturalHeight: number | null;
+  circleCount: number;
+}
