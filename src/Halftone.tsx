@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
 import type { HalftoneProps } from './types';
-import { validateConfig, calculateDisplayDimensions, generateHalftone } from './core';
-
-type State = 'idle' | 'loading' | 'rendered' | 'error';
+import { calculateDisplayDimensions } from './core';
+import { useHalftone } from './useHalftone';
 
 export function Halftone({
   src,
@@ -14,79 +12,26 @@ export function Halftone({
   className,
   style,
 }: HalftoneProps): JSX.Element | null {
-  const [state, setState] = useState<State>('idle');
-  const [svgData, setSvgData] = useState<{
-    pathData: string;
-    viewBox: string;
-    displayWidth: number;
-    displayHeight: number;
-    fillColor: string;
-  } | null>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const { loading, error, pathData, naturalWidth, naturalHeight } =
+    useHalftone(src, { step, density, color });
 
-  useEffect(() => {
-    if (!src) {
-      setState('idle');
-      setSvgData(null);
-      return;
-    }
-
-    setState('loading');
-    setSvgData(null);
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    imageRef.current = img;
-
-    img.onload = () => {
-      if (imageRef.current !== img) return;
-
-      const config = validateConfig({ step, density, color });
-      const result = generateHalftone(img, config);
-      const dims = calculateDisplayDimensions(
-        img.naturalWidth,
-        img.naturalHeight,
-        propWidth,
-        propHeight
-      );
-
-      setSvgData({
-        pathData: result.pathData,
-        viewBox: result.viewBox,
-        displayWidth: dims.width,
-        displayHeight: dims.height,
-        fillColor: config.color,
-      });
-      setState('rendered');
-    };
-
-    img.onerror = () => {
-      if (imageRef.current !== img) return;
-      setState('error');
-      setSvgData(null);
-    };
-
-    img.src = src;
-
-    return () => {
-      imageRef.current = null;
-    };
-  }, [src, color, step, density, propWidth, propHeight]);
-
-  if (state !== 'rendered' || !svgData) {
+  if (loading || error || !pathData || naturalWidth === null || naturalHeight === null) {
     return null;
   }
 
+  const dims = calculateDisplayDimensions(naturalWidth, naturalHeight, propWidth, propHeight);
+  const fillColor = color ?? '#000000';
+
   return (
     <svg
-      viewBox={svgData.viewBox}
-      width={svgData.displayWidth}
-      height={svgData.displayHeight}
+      viewBox={`0 0 ${naturalWidth} ${naturalHeight}`}
+      width={dims.width}
+      height={dims.height}
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       style={style}
     >
-      {svgData.pathData && <path d={svgData.pathData} fill={svgData.fillColor} />}
+      <path d={pathData} fill={fillColor} />
     </svg>
   );
 }
