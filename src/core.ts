@@ -19,6 +19,7 @@ export function validateConfig(config: Partial<HalftoneConfig>): HalftoneConfig 
     step: clamp(config.step ?? 10, MIN_STEP, MAX_STEP),
     density: clamp(config.density ?? 80, MIN_DENSITY, MAX_DENSITY),
     color: isValidHexColor(config.color ?? '') ? config.color! : '#000000',
+    invert: config.invert ?? false,
   };
 }
 
@@ -64,12 +65,13 @@ export function samplePixel(
 }
 
 export function toGreyscale(r: number, g: number, b: number): number {
-  return 0.299 * r + 0.587 * g + 0.114 * b;
+  return (r + g + b) / 3;
 }
 
 export function generateCircles(
   ctx: CanvasRenderingContext2D,
-  grid: GridConfig
+  grid: GridConfig,
+  invert: boolean = false
 ): Circle[] {
   const circles: Circle[] = [];
 
@@ -81,8 +83,8 @@ export function generateCircles(
       const pixel = samplePixel(ctx, x, y);
       const greyscale = toGreyscale(pixel.r, pixel.g, pixel.b);
       const brightness = greyscale / 255;
-      const darkness = 1 - brightness;
-      const radius = grid.maxRadius * darkness;
+      const factor = invert ? brightness : 1 - brightness;
+      const radius = grid.maxRadius * factor;
 
       if (radius > MIN_RADIUS) {
         circles.push({ x, y, r: radius });
@@ -165,7 +167,7 @@ export function generateHalftone(
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(image, 0, 0);
 
-  const circles = generateCircles(ctx, grid);
+  const circles = generateCircles(ctx, grid, config.invert);
   const pathData = generatePathData(circles);
 
   return {

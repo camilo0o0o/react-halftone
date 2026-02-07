@@ -11,7 +11,7 @@ import {
 describe('validateConfig', () => {
   it('returns defaults when called with {}', () => {
     const config = validateConfig({});
-    expect(config).toEqual({ step: 10, density: 80, color: '#000000' });
+    expect(config).toEqual({ step: 10, density: 80, color: '#000000', invert: false });
   });
 
   it('clamps step below 0.1', () => {
@@ -47,6 +47,15 @@ describe('validateConfig', () => {
     expect(validateConfig({ color: '#gg0000' }).color).toBe('#000000');
     expect(validateConfig({ color: '' }).color).toBe('#000000');
     expect(validateConfig({ color: '#12345' }).color).toBe('#000000');
+  });
+
+  it('accepts invert: true', () => {
+    expect(validateConfig({ invert: true }).invert).toBe(true);
+  });
+
+  it('defaults invert to false when not provided', () => {
+    expect(validateConfig({}).invert).toBe(false);
+    expect(validateConfig({ step: 5 }).invert).toBe(false);
   });
 });
 
@@ -101,20 +110,22 @@ describe('calculateGrid', () => {
 
 describe('toGreyscale', () => {
   it('white → 255', () => {
-    expect(toGreyscale(255, 255, 255)).toBeCloseTo(255, 0);
+    expect(toGreyscale(255, 255, 255)).toBe(255);
   });
 
   it('black → 0', () => {
     expect(toGreyscale(0, 0, 0)).toBe(0);
   });
 
-  it('known color → expected luminance', () => {
-    // Pure red: 0.299 * 255 = 76.245
-    expect(toGreyscale(255, 0, 0)).toBeCloseTo(76.245, 1);
-    // Pure green: 0.587 * 255 = 149.685
-    expect(toGreyscale(0, 255, 0)).toBeCloseTo(149.685, 1);
-    // Pure blue: 0.114 * 255 = 29.07
-    expect(toGreyscale(0, 0, 255)).toBeCloseTo(29.07, 1);
+  it('pure colors → average of RGB', () => {
+    // Simple average: (r + g + b) / 3
+    expect(toGreyscale(255, 0, 0)).toBe(85); // 255 / 3
+    expect(toGreyscale(0, 255, 0)).toBe(85);
+    expect(toGreyscale(0, 0, 255)).toBe(85);
+  });
+
+  it('mixed color → correct average', () => {
+    expect(toGreyscale(100, 150, 200)).toBeCloseTo(150, 0); // (100+150+200) / 3
   });
 });
 

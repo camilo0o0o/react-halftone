@@ -177,6 +177,22 @@ describe('useHalftone', () => {
       expect(result.current.loading).toBe(true);
       expect(mockImageInstances).toHaveLength(2);
     });
+
+    it('changing invert config triggers re-processing', () => {
+      const { result, rerender } = renderHook(
+        ({ invert }) => useHalftone('test.png', { invert }),
+        { initialProps: { invert: false } }
+      );
+      triggerImageLoad(0);
+      expect(result.current.loading).toBe(false);
+
+      rerender({ invert: true });
+      expect(result.current.loading).toBe(true);
+      expect(mockImageInstances).toHaveLength(2);
+
+      triggerImageLoad(1);
+      expect(result.current.loading).toBe(false);
+    });
   });
 
   describe('cleanup / stale closure', () => {

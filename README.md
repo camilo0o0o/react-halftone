@@ -1,6 +1,6 @@
 # react-halftone
 
-A React component and hook that converts images into SVG-based halftone effects. It samples pixel brightness from an image and renders a grid of circles — darker areas produce larger circles, lighter areas produce smaller ones.
+A React component and hook that converts images into SVG-based halftone effects. It samples pixel brightness from an image and renders a grid of circles — darker areas produce larger circles, lighter areas produce smaller ones. Supports inverted mode for light-on-dark designs.
 
 ## Install
 
@@ -28,6 +28,17 @@ import { Halftone } from 'react-halftone';
   density={90}
   width={400}
 />
+
+{/* For dark backgrounds, use invert to flip brightness mapping */}
+<div style={{ background: '#1a1a1a' }}>
+  <Halftone
+    src="/photo.jpg"
+    color="#ffffff"
+    invert
+    step={6}
+    density={85}
+  />
+</div>
 ```
 
 ### `useHalftone` hook
@@ -75,6 +86,7 @@ const { pathData, naturalWidth, naturalHeight } = useHalftone(src);
 | `color` | `string` | `"#000000"` | Fill color for circles (hex format) |
 | `step` | `number` | `10` | Grid spacing as % of the smaller image dimension (0.1–50). Lower = more circles. |
 | `density` | `number` | `80` | Max circle size as % of grid cell (0–100). Higher = larger circles. |
+| `invert` | `boolean` | `false` | Invert brightness mapping — bright areas get large circles. Use for dark backgrounds. |
 | `width` | `number` | natural width | Display width in pixels |
 | `height` | `number` | natural height | Display height in pixels |
 | `className` | `string` | — | CSS class for the SVG element |
@@ -95,6 +107,7 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `step` | `number` | `10` | Grid spacing as % of smaller dimension (0.1–50) |
 | `density` | `number` | `80` | Max circle size as % of grid cell (0–100) |
 | `color` | `string` | `"#000000"` | Fill color (hex format, validated internally) |
+| `invert` | `boolean` | `false` | Invert brightness mapping for dark backgrounds |
 
 **Return value (`UseHalftoneResult`):**
 
@@ -108,7 +121,7 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `naturalHeight` | `number \| null` | Source image height in pixels |
 | `circleCount` | `number` | Number of circles (0 when not yet loaded) |
 
-The hook re-runs when `src`, `step`, `density`, or `color` change. Stale loads are automatically cancelled.
+The hook re-runs when `src`, `step`, `density`, `color`, or `invert` change. Stale loads are automatically cancelled.
 
 ## Types
 
@@ -129,6 +142,7 @@ interface HalftoneConfig {
   step: number;    // Grid spacing % (0.1–50)
   density: number; // Max circle size % (0–100)
   color: string;   // Hex color
+  invert: boolean; // Invert brightness mapping
 }
 
 interface UseHalftoneResult {
@@ -145,6 +159,6 @@ interface UseHalftoneResult {
 ## How it works
 
 1. Loads the image and draws it to an offscreen canvas
-2. Samples each grid point's pixel brightness (converted to greyscale)
-3. Maps darkness to circle radius — darker pixels get bigger circles
+2. Samples each grid point's pixel brightness (converted to greyscale using RGB average)
+3. Maps brightness to circle radius — by default, darker pixels get bigger circles; with `invert: true`, brighter pixels get bigger circles
 4. Renders all circles as a single SVG `<path>` for performance

@@ -7,13 +7,14 @@ export function Halftone({
   color,
   step,
   density,
+  invert,
   width: propWidth,
   height: propHeight,
   className,
   style,
 }: HalftoneProps): JSX.Element | null {
   const { loading, error, pathData, naturalWidth, naturalHeight } =
-    useHalftone(src, { step, density, color });
+    useHalftone(src, { step, density, color, invert });
 
   if (loading || error || !pathData || naturalWidth === null || naturalHeight === null) {
     return null;

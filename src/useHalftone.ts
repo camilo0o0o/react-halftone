@@ -57,7 +57,7 @@ export function useHalftone(
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0);
 
-      const circles = generateCircles(ctx, grid);
+      const circles = generateCircles(ctx, grid, validated.invert);
       const pathData = generatePathData(circles);
 
       setResult({ circles, pathData, naturalWidth, naturalHeight });
@@ -77,7 +77,7 @@ export function useHalftone(
       img.onload = null;
       img.onerror = null;
     };
-  }, [src, config.step, config.density, config.color]);
+  }, [src, config.step, config.density, config.color, config.invert]);
 
   return {
     loading,
