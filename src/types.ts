@@ -12,6 +12,9 @@ export interface HalftoneConfig {
 
   /** Fill color for circles (hex format) */
   color: string;
+
+  /** Invert brightness mapping (for dark backgrounds) */
+  invert: boolean;
 }
 
 /**
@@ -29,6 +32,9 @@ export interface HalftoneProps {
 
   /** Maximum circle size percentage (0-100) */
   density?: number;
+
+  /** Invert brightness mapping (for dark backgrounds) */
+  invert?: boolean;
 
   /** Display width in pixels */
   width?: number;

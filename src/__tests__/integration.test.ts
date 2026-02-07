@@ -69,6 +69,51 @@ describe('generateCircles', () => {
       expect(c.x).toBeLessThanOrEqual(50);
     }
   });
+
+  it('solid white canvas with invert=true → circles at max radius', () => {
+    const { ctx } = makeCanvasCtx(100, 100);
+    (ctx as any).fillStyle = '#ffffff';
+    (ctx as any).fillRect(0, 0, 100, 100);
+
+    const grid = calculateGrid(100, 100, 10, 80);
+    const circles = generateCircles(ctx, grid, true);
+
+    expect(circles.length).toBeGreaterThan(0);
+    for (const c of circles) {
+      // With invert, white (brightness=1) → factor=1 → max radius
+      expect(c.r).toBeCloseTo(grid.maxRadius, 1);
+    }
+  });
+
+  it('solid black canvas with invert=true → no circles', () => {
+    const { ctx } = makeCanvasCtx(100, 100);
+    (ctx as any).fillStyle = '#000000';
+    (ctx as any).fillRect(0, 0, 100, 100);
+
+    const grid = calculateGrid(100, 100, 10, 80);
+    const circles = generateCircles(ctx, grid, true);
+
+    // With invert, black (brightness=0) → factor=0 → radius below MIN_RADIUS
+    expect(circles.length).toBe(0);
+  });
+
+  it('half-black/half-white with invert=true → circles only on light side', () => {
+    const { ctx } = makeCanvasCtx(100, 100);
+    // Left half black, right half white
+    (ctx as any).fillStyle = '#000000';
+    (ctx as any).fillRect(0, 0, 50, 100);
+    (ctx as any).fillStyle = '#ffffff';
+    (ctx as any).fillRect(50, 0, 50, 100);
+
+    const grid = calculateGrid(100, 100, 10, 80);
+    const circles = generateCircles(ctx, grid, true);
+
+    expect(circles.length).toBeGreaterThan(0);
+    for (const c of circles) {
+      // With invert, circles should be on the right (light) side
+      expect(c.x).toBeGreaterThanOrEqual(50);
+    }
+  });
 });
 
 describe('generateHalftone (full pipeline)', () => {
@@ -121,5 +166,45 @@ describe('generateHalftone (full pipeline)', () => {
     expect(result.circles).toEqual([]);
     expect(result.pathData).toBe('');
     expect(result.viewBox).toBe('0 0 10 10');
+  });
+
+  it('produces circles on white image with invert=true', () => {
+    const { canvas, ctx } = makeCanvasCtx(100, 100);
+    (ctx as any).fillStyle = '#ffffff';
+    (ctx as any).fillRect(0, 0, 100, 100);
+
+    const img = new CanvasImage();
+    img.src = (canvas as any).toDataURL();
+
+    const result = generateHalftone(img as unknown as HTMLImageElement, {
+      step: 10,
+      density: 80,
+      color: '#ffffff',
+      invert: true,
+    });
+
+    // With invert, white image should produce circles
+    expect(result.circles.length).toBeGreaterThan(0);
+    expect(result.pathData.length).toBeGreaterThan(0);
+  });
+
+  it('produces no circles on black image with invert=true', () => {
+    const { canvas, ctx } = makeCanvasCtx(100, 100);
+    (ctx as any).fillStyle = '#000000';
+    (ctx as any).fillRect(0, 0, 100, 100);
+
+    const img = new CanvasImage();
+    img.src = (canvas as any).toDataURL();
+
+    const result = generateHalftone(img as unknown as HTMLImageElement, {
+      step: 10,
+      density: 80,
+      color: '#ffffff',
+      invert: true,
+    });
+
+    // With invert, black image should produce no circles
+    expect(result.circles).toEqual([]);
+    expect(result.pathData).toBe('');
   });
 });
