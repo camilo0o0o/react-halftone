@@ -188,6 +188,55 @@ describe('generateHalftone (full pipeline)', () => {
     expect(result.pathData.length).toBeGreaterThan(0);
   });
 
+  it('produces square paths with shape=square', () => {
+    const { canvas, ctx } = makeCanvasCtx(100, 100);
+    (ctx as any).fillStyle = '#333333';
+    (ctx as any).fillRect(0, 0, 100, 100);
+
+    const img = new CanvasImage();
+    img.src = (canvas as any).toDataURL();
+
+    const result = generateHalftone(img as unknown as HTMLImageElement, {
+      step: 10,
+      density: 80,
+      color: '#000000',
+      invert: false,
+      shape: 'square',
+      cornerRadius: 0,
+    });
+
+    expect(result.circles.length).toBeGreaterThan(0);
+    expect(result.pathData.length).toBeGreaterThan(0);
+    // Square paths use h/v commands, not arc commands like circles
+    expect(result.pathData).toContain('h');
+    expect(result.pathData).toContain('v');
+    expect(result.pathData).not.toContain('a');
+  });
+
+  it('produces rounded square paths with shape=square and cornerRadius=50', () => {
+    const { canvas, ctx } = makeCanvasCtx(100, 100);
+    (ctx as any).fillStyle = '#333333';
+    (ctx as any).fillRect(0, 0, 100, 100);
+
+    const img = new CanvasImage();
+    img.src = (canvas as any).toDataURL();
+
+    const result = generateHalftone(img as unknown as HTMLImageElement, {
+      step: 10,
+      density: 80,
+      color: '#000000',
+      invert: false,
+      shape: 'square',
+      cornerRadius: 50,
+    });
+
+    expect(result.circles.length).toBeGreaterThan(0);
+    expect(result.pathData.length).toBeGreaterThan(0);
+    // Rounded square paths include arc commands
+    expect(result.pathData).toContain('a');
+    expect(result.pathData).toContain('0 0,1');
+  });
+
   it('produces no circles on black image with invert=true', () => {
     const { canvas, ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#000000';

@@ -1,6 +1,6 @@
 # react-halftone
 
-A React component and hook that converts images into SVG-based halftone effects. It samples pixel brightness from an image and renders a grid of circles — darker areas produce larger circles, lighter areas produce smaller ones. Supports inverted mode for light-on-dark designs.
+A React component and hook that converts images into SVG-based halftone effects. It samples pixel brightness from an image and renders a grid of shapes — darker areas produce larger shapes, lighter areas produce smaller ones. Supports circle and square dot shapes, optional rounded corners on squares, and inverted mode for light-on-dark designs.
 
 ## Install
 
@@ -28,6 +28,12 @@ import { Halftone } from 'react-halftone';
   density={90}
   width={400}
 />
+
+{/* Square dots */}
+<Halftone src="/photo.jpg" shape="square" />
+
+{/* Square dots with rounded corners */}
+<Halftone src="/photo.jpg" shape="square" cornerRadius={30} />
 
 {/* For dark backgrounds, use invert to flip brightness mapping */}
 <div style={{ background: '#1a1a1a' }}>
@@ -87,6 +93,8 @@ const { pathData, naturalWidth, naturalHeight } = useHalftone(src);
 | `step` | `number` | `10` | Grid spacing as % of the smaller image dimension (0.1–50). Lower = more circles. |
 | `density` | `number` | `80` | Max circle size as % of grid cell (0–100). Higher = larger circles. |
 | `invert` | `boolean` | `false` | Invert brightness mapping — bright areas get large circles. Use for dark backgrounds. |
+| `shape` | `'circle' \| 'square'` | `"circle"` | Shape of halftone dots |
+| `cornerRadius` | `number` | `0` | Corner radius for squares as % of half-side (0–100). Ignored when shape is `"circle"`. |
 | `width` | `number` | natural width | Display width in pixels |
 | `height` | `number` | natural height | Display height in pixels |
 | `className` | `string` | — | CSS class for the SVG element |
@@ -108,6 +116,8 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `density` | `number` | `80` | Max circle size as % of grid cell (0–100) |
 | `color` | `string` | `"#000000"` | Fill color (hex format, validated internally) |
 | `invert` | `boolean` | `false` | Invert brightness mapping for dark backgrounds |
+| `shape` | `'circle' \| 'square'` | `"circle"` | Shape of halftone dots |
+| `cornerRadius` | `number` | `0` | Corner radius for squares as % of half-side (0–100) |
 
 **Return value (`UseHalftoneResult`):**
 
@@ -121,14 +131,14 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `naturalHeight` | `number \| null` | Source image height in pixels |
 | `circleCount` | `number` | Number of circles (0 when not yet loaded) |
 
-The hook re-runs when `src`, `step`, `density`, `color`, or `invert` change. Stale loads are automatically cancelled.
+The hook re-runs when `src`, `step`, `density`, `color`, `invert`, `shape`, or `cornerRadius` change. Stale loads are automatically cancelled.
 
 ## Types
 
 All types are exported for use in your own code:
 
 ```ts
-import type { HalftoneProps, HalftoneConfig, Circle, UseHalftoneResult } from 'react-halftone';
+import type { HalftoneProps, HalftoneConfig, Circle, UseHalftoneResult, ShapeType } from 'react-halftone';
 ```
 
 ```ts
@@ -138,11 +148,15 @@ interface Circle {
   r: number; // Radius
 }
 
+type ShapeType = 'circle' | 'square';
+
 interface HalftoneConfig {
-  step: number;    // Grid spacing % (0.1–50)
-  density: number; // Max circle size % (0–100)
-  color: string;   // Hex color
-  invert: boolean; // Invert brightness mapping
+  step: number;           // Grid spacing % (0.1–50)
+  density: number;        // Max circle size % (0–100)
+  color: string;          // Hex color
+  invert: boolean;        // Invert brightness mapping
+  shape: ShapeType;       // Dot shape ('circle' or 'square')
+  cornerRadius: number;   // Corner radius % for squares (0–100)
 }
 
 interface UseHalftoneResult {
@@ -160,5 +174,6 @@ interface UseHalftoneResult {
 
 1. Loads the image and draws it to an offscreen canvas
 2. Samples each grid point's pixel brightness (converted to greyscale using RGB average)
-3. Maps brightness to circle radius — by default, darker pixels get bigger circles; with `invert: true`, brighter pixels get bigger circles
-4. Renders all circles as a single SVG `<path>` for performance
+3. Maps brightness to shape size — by default, darker pixels get bigger shapes; with `invert: true`, brighter pixels get bigger shapes
+4. Generates SVG path commands based on the selected shape (circle arcs, square lines, or rounded-rect lines+arcs)
+5. Renders all shapes as a single SVG `<path>` for performance

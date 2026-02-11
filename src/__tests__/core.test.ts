@@ -4,6 +4,7 @@ import {
   calculateGrid,
   toGreyscale,
   circleToPath,
+  squareToPath,
   generatePathData,
   calculateDisplayDimensions,
 } from '../core';
@@ -11,7 +12,7 @@ import {
 describe('validateConfig', () => {
   it('returns defaults when called with {}', () => {
     const config = validateConfig({});
-    expect(config).toEqual({ step: 10, density: 80, color: '#000000', invert: false });
+    expect(config).toEqual({ step: 10, density: 80, color: '#000000', invert: false, shape: 'circle', cornerRadius: 0 });
   });
 
   it('clamps step below 0.1', () => {
@@ -56,6 +57,41 @@ describe('validateConfig', () => {
   it('defaults invert to false when not provided', () => {
     expect(validateConfig({}).invert).toBe(false);
     expect(validateConfig({ step: 5 }).invert).toBe(false);
+  });
+
+  it('defaults shape to circle when not provided', () => {
+    expect(validateConfig({}).shape).toBe('circle');
+  });
+
+  it('accepts shape: square', () => {
+    expect(validateConfig({ shape: 'square' }).shape).toBe('square');
+  });
+
+  it('accepts shape: circle', () => {
+    expect(validateConfig({ shape: 'circle' }).shape).toBe('circle');
+  });
+
+  it('falls back to circle for invalid shape values', () => {
+    expect(validateConfig({ shape: 'triangle' as any }).shape).toBe('circle');
+    expect(validateConfig({ shape: '' as any }).shape).toBe('circle');
+  });
+
+  it('defaults cornerRadius to 0 when not provided', () => {
+    expect(validateConfig({}).cornerRadius).toBe(0);
+  });
+
+  it('clamps cornerRadius below 0', () => {
+    expect(validateConfig({ cornerRadius: -10 }).cornerRadius).toBe(0);
+  });
+
+  it('clamps cornerRadius above 100', () => {
+    expect(validateConfig({ cornerRadius: 150 }).cornerRadius).toBe(100);
+  });
+
+  it('accepts valid cornerRadius values', () => {
+    expect(validateConfig({ cornerRadius: 50 }).cornerRadius).toBe(50);
+    expect(validateConfig({ cornerRadius: 0 }).cornerRadius).toBe(0);
+    expect(validateConfig({ cornerRadius: 100 }).cornerRadius).toBe(100);
   });
 });
 
@@ -139,6 +175,35 @@ describe('circleToPath', () => {
   });
 });
 
+describe('squareToPath', () => {
+  it('returns sharp-corner square path when cornerRadius is 0', () => {
+    const path = squareToPath(10, 20, 5, 0);
+    // Square centered at (10,20) with half-side 5: top-left (5,15), side=10
+    expect(path).toContain('M5,15');
+    expect(path).toContain('h10');
+    expect(path).toContain('v10');
+    expect(path).toContain('h-10');
+    expect(path).toContain('z');
+  });
+
+  it('returns rounded-corner square path when cornerRadius > 0', () => {
+    const path = squareToPath(10, 20, 5, 50);
+    // cornerRadiusPct=50, s=5 → cr = 5 * 0.5 = 2.5, straight = 2*(5-2.5)=5
+    expect(path).toContain('a2.5,2.5');
+    expect(path).toContain('h5');
+    expect(path).toContain('v5');
+    expect(path).toContain('z');
+  });
+
+  it('handles cornerRadius 100 (fully rounded)', () => {
+    const path = squareToPath(10, 20, 5, 100);
+    // cr = 5 * 1.0 = 5, straight = 2*(5-5) = 0
+    expect(path).toContain('a5,5');
+    expect(path).toContain('h0');
+    expect(path).toContain('v0');
+  });
+});
+
 describe('generatePathData', () => {
   it('empty array → empty string', () => {
     expect(generatePathData([])).toBe('');
@@ -152,6 +217,33 @@ describe('generatePathData', () => {
     const result = generatePathData(circles);
     expect(result).toContain('M0,0');
     expect(result).toContain('M10,10');
+  });
+
+  it('with shape=square produces square paths', () => {
+    const circles = [
+      { x: 10, y: 10, r: 5 },
+    ];
+    const result = generatePathData(circles, 'square', 0);
+    // Should contain square path elements, not arc elements
+    expect(result).toContain('h10');
+    expect(result).toContain('v10');
+    expect(result).not.toContain('a5,5');
+  });
+
+  it('with shape=square and cornerRadius produces rounded square paths', () => {
+    const circles = [
+      { x: 10, y: 10, r: 5 },
+    ];
+    const result = generatePathData(circles, 'square', 50);
+    expect(result).toContain('a2.5,2.5');
+  });
+
+  it('with shape=circle (default) produces circle paths', () => {
+    const circles = [
+      { x: 10, y: 10, r: 5 },
+    ];
+    const result = generatePathData(circles);
+    expect(result).toContain('a5,5 0 1,0');
   });
 });
 

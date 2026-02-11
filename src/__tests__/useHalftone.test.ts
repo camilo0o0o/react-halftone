@@ -178,6 +178,38 @@ describe('useHalftone', () => {
       expect(mockImageInstances).toHaveLength(2);
     });
 
+    it('changing shape config triggers re-processing', () => {
+      const { result, rerender } = renderHook(
+        ({ shape }) => useHalftone('test.png', { shape }),
+        { initialProps: { shape: 'circle' as const } }
+      );
+      triggerImageLoad(0);
+      expect(result.current.loading).toBe(false);
+
+      rerender({ shape: 'square' as const });
+      expect(result.current.loading).toBe(true);
+      expect(mockImageInstances).toHaveLength(2);
+
+      triggerImageLoad(1);
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('changing cornerRadius config triggers re-processing', () => {
+      const { result, rerender } = renderHook(
+        ({ cornerRadius }) => useHalftone('test.png', { shape: 'square', cornerRadius }),
+        { initialProps: { cornerRadius: 0 } }
+      );
+      triggerImageLoad(0);
+      expect(result.current.loading).toBe(false);
+
+      rerender({ cornerRadius: 50 });
+      expect(result.current.loading).toBe(true);
+      expect(mockImageInstances).toHaveLength(2);
+
+      triggerImageLoad(1);
+      expect(result.current.loading).toBe(false);
+    });
+
     it('changing invert config triggers re-processing', () => {
       const { result, rerender } = renderHook(
         ({ invert }) => useHalftone('test.png', { invert }),
