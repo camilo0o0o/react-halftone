@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { Halftone } from '../Halftone';
 import type { UseHalftoneResult } from '../types';
+import { useHalftone } from '../useHalftone';
 
 const defaultHookResult: UseHalftoneResult = {
   loading: false,
@@ -103,6 +104,29 @@ describe('Halftone component', () => {
       render(<Halftone src="test.png" style={{ opacity: 0.5 }} />);
       const svg = container.querySelector('svg')!;
       expect(svg.style.opacity).toBe('0.5');
+    });
+  });
+
+  describe('shape and cornerRadius props', () => {
+    it('forwards shape and cornerRadius to useHalftone', () => {
+      render(<Halftone src="test.png" shape="square" cornerRadius={30} />);
+      expect(useHalftone).toHaveBeenCalledWith('test.png', expect.objectContaining({
+        shape: 'square',
+        cornerRadius: 30,
+      }));
+    });
+
+    it('forwards shape without cornerRadius', () => {
+      render(<Halftone src="test.png" shape="square" />);
+      expect(useHalftone).toHaveBeenCalledWith('test.png', expect.objectContaining({
+        shape: 'square',
+      }));
+    });
+
+    it('renders SVG when shape is square', () => {
+      render(<Halftone src="test.png" shape="square" />);
+      const svg = container.querySelector('svg');
+      expect(svg).not.toBeNull();
     });
   });
 

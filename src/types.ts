@@ -1,6 +1,11 @@
 import type { CSSProperties } from 'react';
 
 /**
+ * Shape type for halftone dots
+ */
+export type ShapeType = 'circle' | 'square';
+
+/**
  * Configuration for halftone generation
  */
 export interface HalftoneConfig {
@@ -15,6 +20,12 @@ export interface HalftoneConfig {
 
   /** Invert brightness mapping (for dark backgrounds) */
   invert: boolean;
+
+  /** Shape of halftone dots */
+  shape: ShapeType;
+
+  /** Corner radius percentage for square shapes (0-100) */
+  cornerRadius: number;
 }
 
 /**
@@ -35,6 +46,12 @@ export interface HalftoneProps {
 
   /** Invert brightness mapping (for dark backgrounds) */
   invert?: boolean;
+
+  /** Shape of halftone dots */
+  shape?: ShapeType;
+
+  /** Corner radius percentage for square shapes (0-100) */
+  cornerRadius?: number;
 
   /** Display width in pixels */
   width?: number;
