@@ -2,7 +2,7 @@
 
 A React component and hook that converts images into SVG-based halftone effects. It samples pixel brightness from an image and renders a grid of shapes — darker areas produce larger shapes, lighter areas produce smaller ones. Supports circle and square dot shapes, optional rounded corners on squares, and inverted mode for light-on-dark designs.
 
-<video src="https://raw.githubusercontent.com/camilo0o0o/react-halftone/main/assets/halftone_demo.mov" width="720" autoplay loop muted playsinline></video>
+![halftone_gif](https://github.com/user-attachments/assets/f1be70b2-84e4-4773-9f63-81335fb911eb)
 
 ## Install
 
