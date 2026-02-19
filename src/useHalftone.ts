@@ -38,7 +38,7 @@ export function useHalftone(
       const validated = validateConfig(config);
       const { naturalWidth, naturalHeight } = img;
 
-      const grid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density);
+      const grid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis);
 
       if (grid.numCols < 1 || grid.numRows < 1) {
         setResult({
@@ -77,7 +77,7 @@ export function useHalftone(
       img.onload = null;
       img.onerror = null;
     };
-  }, [src, config.step, config.density, config.color, config.invert, config.shape, config.cornerRadius]);
+  }, [src, config.step, config.density, config.color, config.invert, config.shape, config.cornerRadius, config.stepBasis]);
 
   return {
     loading,

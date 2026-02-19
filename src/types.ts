@@ -26,6 +26,9 @@ export interface HalftoneConfig {
 
   /** Corner radius percentage for square shapes (0-100) */
   cornerRadius: number;
+
+  /** Dimension used to calculate step size: 'min' (smaller dimension) or 'width' (image width) */
+  stepBasis: 'min' | 'width';
 }
 
 /**
@@ -52,6 +55,9 @@ export interface HalftoneProps {
 
   /** Corner radius percentage for square shapes (0-100) */
   cornerRadius?: number;
+
+  /** Dimension used to calculate step size: 'min' (smaller dimension) or 'width' (image width) */
+  stepBasis?: 'min' | 'width';
 
   /** Display width in pixels */
   width?: number;

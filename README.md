@@ -97,6 +97,7 @@ const { pathData, naturalWidth, naturalHeight } = useHalftone(src);
 | `invert` | `boolean` | `false` | Invert brightness mapping — bright areas get large circles. Use for dark backgrounds. |
 | `shape` | `'circle' \| 'square'` | `"circle"` | Shape of halftone dots |
 | `cornerRadius` | `number` | `0` | Corner radius for squares as % of half-side (0–100). Ignored when shape is `"circle"`. |
+| `stepBasis` | `'min' \| 'width'` | `'min'` | Dimension used for step calculation. `'width'` uses image width for consistent dot sizes across orientations. |
 | `width` | `number` | natural width | Display width in pixels |
 | `height` | `number` | natural height | Display height in pixels |
 | `className` | `string` | — | CSS class for the SVG element |
@@ -120,6 +121,7 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `invert` | `boolean` | `false` | Invert brightness mapping for dark backgrounds |
 | `shape` | `'circle' \| 'square'` | `"circle"` | Shape of halftone dots |
 | `cornerRadius` | `number` | `0` | Corner radius for squares as % of half-side (0–100) |
+| `stepBasis` | `'min' \| 'width'` | `'min'` | Dimension used for step calculation. `'width'` uses image width instead of smaller dimension. |
 
 **Return value (`UseHalftoneResult`):**
 
@@ -133,7 +135,7 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `naturalHeight` | `number \| null` | Source image height in pixels |
 | `circleCount` | `number` | Number of circles (0 when not yet loaded) |
 
-The hook re-runs when `src`, `step`, `density`, `color`, `invert`, `shape`, or `cornerRadius` change. Stale loads are automatically cancelled.
+The hook re-runs when `src`, `step`, `density`, `color`, `invert`, `shape`, `cornerRadius`, or `stepBasis` change. Stale loads are automatically cancelled.
 
 ## Types
 
@@ -159,6 +161,7 @@ interface HalftoneConfig {
   invert: boolean;        // Invert brightness mapping
   shape: ShapeType;       // Dot shape ('circle' or 'square')
   cornerRadius: number;   // Corner radius % for squares (0–100)
+  stepBasis: 'min' | 'width'; // Dimension for step calculation
 }
 
 interface UseHalftoneResult {

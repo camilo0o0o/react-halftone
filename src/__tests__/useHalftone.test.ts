@@ -225,6 +225,22 @@ describe('useHalftone', () => {
       triggerImageLoad(1);
       expect(result.current.loading).toBe(false);
     });
+
+    it('changing stepBasis config triggers re-processing', () => {
+      const { result, rerender } = renderHook(
+        ({ stepBasis }) => useHalftone('test.png', { stepBasis }),
+        { initialProps: { stepBasis: 'min' as const } }
+      );
+      triggerImageLoad(0);
+      expect(result.current.loading).toBe(false);
+
+      rerender({ stepBasis: 'width' as const });
+      expect(result.current.loading).toBe(true);
+      expect(mockImageInstances).toHaveLength(2);
+
+      triggerImageLoad(1);
+      expect(result.current.loading).toBe(false);
+    });
   });
 
   describe('cleanup / stale closure', () => {

@@ -12,7 +12,7 @@ import {
 describe('validateConfig', () => {
   it('returns defaults when called with {}', () => {
     const config = validateConfig({});
-    expect(config).toEqual({ step: 10, density: 80, color: '#000000', invert: false, shape: 'circle', cornerRadius: 0 });
+    expect(config).toEqual({ step: 10, density: 80, color: '#000000', invert: false, shape: 'circle', cornerRadius: 0, stepBasis: 'min' });
   });
 
   it('clamps step below 0.1', () => {
@@ -141,6 +141,38 @@ describe('calculateGrid', () => {
   it('edge case: density=0 → maxRadius=0', () => {
     const grid = calculateGrid(100, 100, 10, 0);
     expect(grid.maxRadius).toBe(0);
+  });
+
+  it('stepBasis=width on landscape uses width as reference', () => {
+    const grid = calculateGrid(400, 200, 10, 50, 'width');
+    // reference = width = 400, stepPx = 400 * 0.1 = 40
+    expect(grid.stepPx).toBe(40);
+  });
+
+  it('stepBasis=min on landscape uses smaller dimension', () => {
+    const grid = calculateGrid(400, 200, 10, 50, 'min');
+    // reference = min(400,200) = 200, stepPx = 200 * 0.1 = 20
+    expect(grid.stepPx).toBe(20);
+  });
+
+  it('stepBasis=width on portrait matches min (width is smaller)', () => {
+    const grid = calculateGrid(200, 400, 10, 50, 'width');
+    const gridMin = calculateGrid(200, 400, 10, 50, 'min');
+    // portrait: width=200 is the smaller dim, so both should give stepPx=20
+    expect(grid.stepPx).toBe(20);
+    expect(grid.stepPx).toBe(gridMin.stepPx);
+  });
+
+  it('stepBasis=width on square matches min', () => {
+    const grid = calculateGrid(200, 200, 10, 50, 'width');
+    const gridMin = calculateGrid(200, 200, 10, 50, 'min');
+    expect(grid.stepPx).toBe(gridMin.stepPx);
+  });
+
+  it('defaults to min when stepBasis is omitted', () => {
+    const gridDefault = calculateGrid(400, 200, 10, 50);
+    const gridMin = calculateGrid(400, 200, 10, 50, 'min');
+    expect(gridDefault.stepPx).toBe(gridMin.stepPx);
   });
 });
 

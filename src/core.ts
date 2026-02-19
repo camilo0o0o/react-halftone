@@ -28,6 +28,7 @@ export function validateConfig(config: Partial<HalftoneConfig>): HalftoneConfig 
     invert: config.invert ?? false,
     shape,
     cornerRadius: clamp(config.cornerRadius ?? 0, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS),
+    stepBasis: config.stepBasis === 'width' ? 'width' : 'min',
   };
 }
 
@@ -35,10 +36,13 @@ export function calculateGrid(
   imageWidth: number,
   imageHeight: number,
   step: number,
-  density: number
+  density: number,
+  stepBasis: 'min' | 'width' = 'min'
 ): GridConfig {
-  const smallerDimension = Math.min(imageWidth, imageHeight);
-  const stepPx = smallerDimension * (step / 100);
+  const referenceDimension = stepBasis === 'width'
+    ? imageWidth
+    : Math.min(imageWidth, imageHeight);
+  const stepPx = referenceDimension * (step / 100);
   const maxRadius = (stepPx / 2) * (density / 100);
 
   const availableWidth = imageWidth - 2 * maxRadius;
@@ -181,7 +185,7 @@ export function generateHalftone(
 } {
   const { naturalWidth, naturalHeight } = image;
 
-  const grid = calculateGrid(naturalWidth, naturalHeight, config.step, config.density);
+  const grid = calculateGrid(naturalWidth, naturalHeight, config.step, config.density, config.stepBasis);
 
   if (grid.numCols < 1 || grid.numRows < 1) {
     return {
