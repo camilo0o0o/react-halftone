@@ -57,7 +57,8 @@ export function useHalftone(
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0);
 
-      const circles = generateCircles(ctx, grid, validated.invert);
+      const pixels = ctx.getImageData(0, 0, naturalWidth, naturalHeight).data;
+      const circles = generateCircles(pixels, naturalWidth, naturalHeight, grid, validated.invert);
       const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
 
       setResult({ circles, pathData, naturalWidth, naturalHeight });

@@ -67,13 +67,17 @@ export function calculateGrid(
   };
 }
 
-export function samplePixel(
-  ctx: CanvasRenderingContext2D,
+export function samplePixelFromBuffer(
+  pixels: Uint8ClampedArray,
   x: number,
-  y: number
+  y: number,
+  imageWidth: number,
+  imageHeight: number
 ): { r: number; g: number; b: number } {
-  const data = ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
-  return { r: data[0], g: data[1], b: data[2] };
+  const px = clamp(Math.round(x), 0, imageWidth - 1);
+  const py = clamp(Math.round(y), 0, imageHeight - 1);
+  const offset = (py * imageWidth + px) * 4;
+  return { r: pixels[offset], g: pixels[offset + 1], b: pixels[offset + 2] };
 }
 
 export function toGreyscale(r: number, g: number, b: number): number {
@@ -81,7 +85,9 @@ export function toGreyscale(r: number, g: number, b: number): number {
 }
 
 export function generateCircles(
-  ctx: CanvasRenderingContext2D,
+  pixels: Uint8ClampedArray,
+  imageWidth: number,
+  imageHeight: number,
   grid: GridConfig,
   invert: boolean = false
 ): Circle[] {
@@ -92,7 +98,7 @@ export function generateCircles(
       const x = grid.startX + col * grid.stepPx;
       const y = grid.startY + row * grid.stepPx;
 
-      const pixel = samplePixel(ctx, x, y);
+      const pixel = samplePixelFromBuffer(pixels, x, y, imageWidth, imageHeight);
       const greyscale = toGreyscale(pixel.r, pixel.g, pixel.b);
       const brightness = greyscale / 255;
       const factor = invert ? brightness : 1 - brightness;
@@ -201,7 +207,8 @@ export function generateHalftone(
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(image, 0, 0);
 
-  const circles = generateCircles(ctx, grid, config.invert);
+  const pixels = ctx.getImageData(0, 0, naturalWidth, naturalHeight).data;
+  const circles = generateCircles(pixels, naturalWidth, naturalHeight, grid, config.invert);
   const pathData = generatePathData(circles, config.shape, config.cornerRadius);
 
   return {

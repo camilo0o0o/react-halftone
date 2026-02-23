@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createCanvas, Image as CanvasImage } from 'canvas';
 import {
-  samplePixel,
+  samplePixelFromBuffer,
   generateCircles,
   calculateGrid,
   generateHalftone,
@@ -13,12 +13,35 @@ function makeCanvasCtx(width: number, height: number) {
   return { canvas, ctx: ctx as unknown as CanvasRenderingContext2D };
 }
 
-describe('samplePixel', () => {
+describe('samplePixelFromBuffer', () => {
   it('returns correct RGB for a known fill color', () => {
     const { ctx } = makeCanvasCtx(10, 10);
     (ctx as any).fillStyle = '#ff8040';
     (ctx as any).fillRect(0, 0, 10, 10);
-    const pixel = samplePixel(ctx, 5, 5);
+    const pixels = (ctx as any).getImageData(0, 0, 10, 10).data;
+    const pixel = samplePixelFromBuffer(pixels, 5, 5, 10, 10);
+    expect(pixel.r).toBe(255);
+    expect(pixel.g).toBe(128);
+    expect(pixel.b).toBe(64);
+  });
+
+  it('clamps out-of-bounds coordinates to image edges', () => {
+    const { ctx } = makeCanvasCtx(10, 10);
+    (ctx as any).fillStyle = '#ff8040';
+    (ctx as any).fillRect(0, 0, 10, 10);
+    const pixels = (ctx as any).getImageData(0, 0, 10, 10).data;
+    const pixel = samplePixelFromBuffer(pixels, 20, 20, 10, 10);
+    expect(pixel.r).toBe(255);
+    expect(pixel.g).toBe(128);
+    expect(pixel.b).toBe(64);
+  });
+
+  it('clamps negative coordinates to zero', () => {
+    const { ctx } = makeCanvasCtx(10, 10);
+    (ctx as any).fillStyle = '#ff8040';
+    (ctx as any).fillRect(0, 0, 10, 10);
+    const pixels = (ctx as any).getImageData(0, 0, 10, 10).data;
+    const pixel = samplePixelFromBuffer(pixels, -5, -5, 10, 10);
     expect(pixel.r).toBe(255);
     expect(pixel.g).toBe(128);
     expect(pixel.b).toBe(64);
@@ -30,9 +53,10 @@ describe('generateCircles', () => {
     const { ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#000000';
     (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
     const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(ctx, grid);
+    const circles = generateCircles(pixels, 100, 100, grid);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
@@ -45,9 +69,10 @@ describe('generateCircles', () => {
     const { ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#ffffff';
     (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
     const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(ctx, grid);
+    const circles = generateCircles(pixels, 100, 100, grid);
 
     expect(circles.length).toBe(0);
   });
@@ -59,9 +84,10 @@ describe('generateCircles', () => {
     (ctx as any).fillRect(0, 0, 50, 100);
     (ctx as any).fillStyle = '#ffffff';
     (ctx as any).fillRect(50, 0, 50, 100);
+    const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
     const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(ctx, grid);
+    const circles = generateCircles(pixels, 100, 100, grid);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
@@ -74,9 +100,10 @@ describe('generateCircles', () => {
     const { ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#ffffff';
     (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
     const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(ctx, grid, true);
+    const circles = generateCircles(pixels, 100, 100, grid, true);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
@@ -89,9 +116,10 @@ describe('generateCircles', () => {
     const { ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#000000';
     (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
     const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(ctx, grid, true);
+    const circles = generateCircles(pixels, 100, 100, grid, true);
 
     // With invert, black (brightness=0) → factor=0 → radius below MIN_RADIUS
     expect(circles.length).toBe(0);
@@ -104,9 +132,10 @@ describe('generateCircles', () => {
     (ctx as any).fillRect(0, 0, 50, 100);
     (ctx as any).fillStyle = '#ffffff';
     (ctx as any).fillRect(50, 0, 50, 100);
+    const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
     const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(ctx, grid, true);
+    const circles = generateCircles(pixels, 100, 100, grid, true);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
