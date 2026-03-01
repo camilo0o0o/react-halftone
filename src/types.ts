@@ -132,3 +132,5 @@ export interface UseHalftoneResult {
   naturalHeight: number | null;
   circleCount: number;
 }
+
+export type HalftoneCanvasProps = HalftoneProps;
