@@ -1,6 +1,6 @@
 # react-halftone
 
-A React component and hook that converts images into SVG-based halftone effects. It samples pixel brightness from an image and renders a grid of shapes — darker areas produce larger shapes, lighter areas produce smaller ones. Supports circle and square dot shapes, optional rounded corners on squares, and inverted mode for light-on-dark designs.
+A React component and hook that converts images into halftone effects. It samples pixel brightness from an image and renders a grid of shapes — darker areas produce larger shapes, lighter areas produce smaller ones. Supports SVG and Canvas output, circle and square dot shapes, optional rounded corners on squares, and inverted mode for light-on-dark designs.
 
 ![halftone_gif](https://github.com/user-attachments/assets/f1be70b2-84e4-4773-9f63-81335fb911eb)
 
@@ -49,6 +49,32 @@ import { Halftone } from 'react-halftone';
 </div>
 ```
 
+### `HalftoneCanvas` component
+
+Drop-in Canvas alternative to `Halftone`. Produces a rasterized `<canvas>` instead of SVG, which is lighter on the DOM when rendering many halftone images simultaneously. Accepts the same props and supports `ref` forwarding for direct canvas access (e.g. `toDataURL()`).
+
+```tsx
+import { HalftoneCanvas } from 'react-halftone';
+
+<HalftoneCanvas src="/photo.jpg" />
+
+<HalftoneCanvas
+  src="/photo.jpg"
+  color="#ff0000"
+  step={8}
+  density={90}
+  width={400}
+/>
+
+{/* Square dots with rounded corners */}
+<HalftoneCanvas src="/photo.jpg" shape="square" cornerRadius={30} />
+
+{/* Access the canvas element via ref */}
+const canvasRef = useRef<HTMLCanvasElement>(null);
+<HalftoneCanvas ref={canvasRef} src="/photo.jpg" />
+// canvasRef.current.toDataURL('image/png')
+```
+
 ### `useHalftone` hook
 
 For custom rendering or data access, use the hook directly. It returns the raw circle data, SVG path string, and image dimensions.
@@ -86,7 +112,9 @@ const { pathData, naturalWidth, naturalHeight } = useHalftone(src);
 
 ## Props
 
-### `Halftone` component props
+### `Halftone` / `HalftoneCanvas` component props
+
+Both components accept the same props:
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -100,8 +128,9 @@ const { pathData, naturalWidth, naturalHeight } = useHalftone(src);
 | `stepBasis` | `'min' \| 'width'` | `'min'` | Dimension used for step calculation. `'width'` uses image width for consistent dot sizes across orientations. |
 | `width` | `number` | natural width | Display width in pixels |
 | `height` | `number` | natural height | Display height in pixels |
-| `className` | `string` | — | CSS class for the SVG element |
-| `style` | `CSSProperties` | — | Inline styles for the SVG element |
+| `className` | `string` | — | CSS class for the element |
+| `style` | `CSSProperties` | — | Inline styles for the element |
+| `ref` | `Ref<HTMLCanvasElement>` | — | (`HalftoneCanvas` only) Ref to the canvas element |
 
 If both `width` and `height` are provided, the image scales to fit within those bounds while preserving aspect ratio. If only one is provided, the other is calculated automatically.
 
@@ -142,7 +171,7 @@ The hook re-runs when `src`, `step`, `density`, `color`, `invert`, `shape`, `cor
 All types are exported for use in your own code:
 
 ```ts
-import type { HalftoneProps, HalftoneConfig, Circle, UseHalftoneResult, ShapeType } from 'react-halftone';
+import type { HalftoneProps, HalftoneCanvasProps, HalftoneConfig, Circle, UseHalftoneResult, ShapeType } from 'react-halftone';
 ```
 
 ```ts
@@ -181,4 +210,4 @@ interface UseHalftoneResult {
 2. Samples each grid point's pixel brightness (converted to greyscale using RGB average)
 3. Maps brightness to shape size — by default, darker pixels get bigger shapes; with `invert: true`, brighter pixels get bigger shapes
 4. Generates SVG path commands based on the selected shape (circle arcs, square lines, or rounded-rect lines+arcs)
-5. Renders all shapes as a single SVG `<path>` for performance
+5. `Halftone` renders all shapes as a single SVG `<path>` for performance; `HalftoneCanvas` draws to a `<canvas>` bitmap for lighter DOM weight
