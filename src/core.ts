@@ -1,4 +1,5 @@
-import type { HalftoneConfig, Circle, GridConfig, DisplayDimensions, ShapeType } from './types';
+import type { HalftoneConfig, Circle, GridConfig, DisplayDimensions, ShapeType, CMYKChannel, HalftoneCMYKProps } from './types';
+import { rgbToCmyk } from './colorConversion';
 
 const MIN_RADIUS = 0.5;
 const MIN_STEP = 0.1;
@@ -9,7 +10,7 @@ const MIN_CORNER_RADIUS = 0;
 const MAX_CORNER_RADIUS = 100;
 const VALID_SHAPES: ShapeType[] = ['circle', 'square'];
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
@@ -216,4 +217,110 @@ export function generateHalftone(
     pathData,
     viewBox: `0 0 ${naturalWidth} ${naturalHeight}`,
   };
+}
+
+// --- CMYK Halftone ---
+
+export const CMYK_DEFAULT_ANGLES = { c: 15, m: 75, y: 0, k: 45 } as const;
+export const CMYK_CHANNEL_COLORS = { c: '#00FFFF', m: '#FF00FF', y: '#FFFF00', k: '#000000' } as const;
+const CMYK_CHANNELS: CMYKChannel[] = ['c', 'm', 'y', 'k'];
+
+export interface ValidatedCMYKChannelConfig {
+  angle: number;
+  step: number;
+  density: number;
+  shape: ShapeType;
+  cornerRadius: number;
+}
+
+export interface ValidatedCMYKConfig {
+  stepBasis: 'min' | 'width';
+  channels: Record<CMYKChannel, ValidatedCMYKChannelConfig>;
+}
+
+export function validateCMYKConfig(props: Partial<HalftoneCMYKProps>): ValidatedCMYKConfig {
+  const globalStep = clamp(props.step ?? 10, MIN_STEP, MAX_STEP);
+  const globalDensity = clamp(props.density ?? 80, MIN_DENSITY, MAX_DENSITY);
+  const globalShape = VALID_SHAPES.includes(props.shape as ShapeType)
+    ? (props.shape as ShapeType)
+    : 'circle';
+  const globalCornerRadius = clamp(props.cornerRadius ?? 0, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS);
+  const stepBasis = props.stepBasis === 'width' ? 'width' : 'min' as const;
+
+  const channels = {} as Record<CMYKChannel, ValidatedCMYKChannelConfig>;
+
+  for (const ch of CMYK_CHANNELS) {
+    const override = props.channels?.[ch];
+    const shape = override?.shape && VALID_SHAPES.includes(override.shape)
+      ? override.shape
+      : globalShape;
+    channels[ch] = {
+      angle: ((override?.angle ?? CMYK_DEFAULT_ANGLES[ch]) % 360 + 360) % 360,
+      step: clamp(override?.step ?? globalStep, MIN_STEP, MAX_STEP),
+      density: clamp(override?.density ?? globalDensity, MIN_DENSITY, MAX_DENSITY),
+      shape,
+      cornerRadius: clamp(override?.cornerRadius ?? globalCornerRadius, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS),
+    };
+  }
+
+  return { stepBasis, channels };
+}
+
+export function generateRotatedGridPoints(
+  imageWidth: number,
+  imageHeight: number,
+  stepPx: number,
+  angleDeg: number
+): Array<{ x: number; y: number }> {
+  const cx = imageWidth / 2;
+  const cy = imageHeight / 2;
+  const diag = Math.sqrt(imageWidth * imageWidth + imageHeight * imageHeight);
+  const halfDiag = diag / 2;
+
+  const normalizedAngle = ((angleDeg % 360) + 360) % 360;
+  const theta = (normalizedAngle * Math.PI) / 180;
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+
+  const numSteps = Math.ceil(halfDiag / stepPx);
+  const points: Array<{ x: number; y: number }> = [];
+
+  for (let row = -numSteps; row <= numSteps; row++) {
+    for (let col = -numSteps; col <= numSteps; col++) {
+      const gx = col * stepPx;
+      const gy = row * stepPx;
+
+      const x = cx + gx * cosT - gy * sinT;
+      const y = cy + gx * sinT + gy * cosT;
+
+      if (x >= 0 && x < imageWidth && y >= 0 && y < imageHeight) {
+        points.push({ x, y });
+      }
+    }
+  }
+
+  return points;
+}
+
+export function generateChannelCircles(
+  pixels: Uint8ClampedArray,
+  imageWidth: number,
+  imageHeight: number,
+  gridPoints: Array<{ x: number; y: number }>,
+  maxRadius: number,
+  channel: CMYKChannel
+): Circle[] {
+  const circles: Circle[] = [];
+
+  for (const pt of gridPoints) {
+    const pixel = samplePixelFromBuffer(pixels, pt.x, pt.y, imageWidth, imageHeight);
+    const cmyk = rgbToCmyk(pixel.r, pixel.g, pixel.b);
+    const radius = maxRadius * cmyk[channel];
+
+    if (radius > MIN_RADIUS) {
+      circles.push({ x: pt.x, y: pt.y, r: radius });
+    }
+  }
+
+  return circles;
 }
