@@ -1,33 +1,35 @@
 import { useState, useEffect } from 'react';
-import type { HalftoneConfig, UseHalftoneResult } from './types';
-import { validateConfig, calculateGrid, generateCircles, generatePathData } from './core';
+import type { HalftoneConfig, HalftoneStatus, UseHalftoneResult, Circle } from './types';
+import { validateConfig, calculateGrid, generateCircles, generatePathData, computeDownsampleScale, scaleCircles } from './core';
+
+interface State {
+  status: HalftoneStatus;
+  error: Error | null;
+  result: {
+    circles: Circle[];
+    pathData: string;
+    naturalWidth: number;
+    naturalHeight: number;
+  } | null;
+}
+
+const IDLE_STATE: State = { status: 'idle', error: null, result: null };
 
 export function useHalftone(
   src: string,
   config: Partial<HalftoneConfig> = {}
 ): UseHalftoneResult {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [result, setResult] = useState<{
-    circles: import('./types').Circle[];
-    pathData: string;
-    naturalWidth: number;
-    naturalHeight: number;
-  } | null>(null);
+  const [state, setState] = useState<State>(IDLE_STATE);
 
   useEffect(() => {
     if (!src) {
-      setLoading(false);
-      setError(null);
-      setResult(null);
+      setState(IDLE_STATE);
       return;
     }
 
     let cancelled = false;
 
-    setLoading(true);
-    setError(null);
-    setResult(null);
+    setState({ status: 'loading', error: null, result: null });
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -35,40 +37,54 @@ export function useHalftone(
     img.onload = () => {
       if (cancelled) return;
 
-      const validated = validateConfig(config);
-      const { naturalWidth, naturalHeight } = img;
+      setState({ status: 'processing', error: null, result: null });
 
-      const grid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis);
+      requestAnimationFrame(() => {
+        if (cancelled) return;
 
-      if (grid.numCols < 1 || grid.numRows < 1) {
-        setResult({
-          circles: [],
-          pathData: '',
-          naturalWidth,
-          naturalHeight,
+        const validated = validateConfig(config);
+        const { naturalWidth, naturalHeight } = img;
+
+        const fullGrid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis);
+
+        if (fullGrid.numCols < 1 || fullGrid.numRows < 1) {
+          setState({
+            status: 'ready',
+            error: null,
+            result: { circles: [], pathData: '', naturalWidth, naturalHeight },
+          });
+          return;
+        }
+
+        const scale = computeDownsampleScale(fullGrid.stepPx);
+        const workWidth = Math.round(naturalWidth / scale);
+        const workHeight = Math.round(naturalHeight / scale);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = workWidth;
+        canvas.height = workHeight;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, workWidth, workHeight);
+
+        const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
+        const grid = scale === 1
+          ? fullGrid
+          : calculateGrid(workWidth, workHeight, validated.step, validated.density, validated.stepBasis);
+        const rawCircles = generateCircles(pixels, workWidth, workHeight, grid, validated.invert);
+        const circles = scaleCircles(rawCircles, scale);
+        const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
+
+        setState({
+          status: 'ready',
+          error: null,
+          result: { circles, pathData, naturalWidth, naturalHeight },
         });
-        setLoading(false);
-        return;
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = naturalWidth;
-      canvas.height = naturalHeight;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0);
-
-      const pixels = ctx.getImageData(0, 0, naturalWidth, naturalHeight).data;
-      const circles = generateCircles(pixels, naturalWidth, naturalHeight, grid, validated.invert);
-      const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
-
-      setResult({ circles, pathData, naturalWidth, naturalHeight });
-      setLoading(false);
+      });
     };
 
     img.onerror = () => {
       if (cancelled) return;
-      setError(new Error(`Failed to load image: ${src}`));
-      setLoading(false);
+      setState({ status: 'error', error: new Error(`Failed to load image: ${src}`), result: null });
     };
 
     img.src = src;
@@ -81,12 +97,12 @@ export function useHalftone(
   }, [src, config.step, config.density, config.color, config.invert, config.shape, config.cornerRadius, config.stepBasis]);
 
   return {
-    loading,
-    error,
-    circles: result?.circles ?? null,
-    pathData: result?.pathData ?? null,
-    naturalWidth: result?.naturalWidth ?? null,
-    naturalHeight: result?.naturalHeight ?? null,
-    circleCount: result?.circles?.length ?? 0,
+    status: state.status,
+    error: state.error,
+    circles: state.result?.circles ?? null,
+    pathData: state.result?.pathData ?? null,
+    naturalWidth: state.result?.naturalWidth ?? null,
+    naturalHeight: state.result?.naturalHeight ?? null,
+    circleCount: state.result?.circles?.length ?? 0,
   };
 }

@@ -108,4 +108,19 @@ describe('generateChannelCircles', () => {
       expect(c.r).toBeGreaterThan(0.5);
     }
   });
+
+  it('near-white pixels (251,251,251) are skipped by early-exit', () => {
+    const pixels = makePixels(W, H, '#fbfbfb');
+    const kCircles = generateChannelCircles(pixels, W, H, gridPoints, maxRadius, 'k');
+    expect(kCircles.length).toBe(0);
+  });
+
+  it('off-white pixels (240,240,240) still produce dots', () => {
+    const pixels = makePixels(W, H, '#f0f0f0');
+    // RGB(240,240,240) → K ≈ 0.059, radius = 4 * 0.059 ≈ 0.24 → below MIN_RADIUS
+    // So no dots expected at maxRadius=4, but with larger maxRadius they would appear
+    const largeMaxRadius = 20;
+    const kCircles = generateChannelCircles(pixels, W, H, gridPoints, largeMaxRadius, 'k');
+    expect(kCircles.length).toBeGreaterThan(0);
+  });
 });

@@ -35,7 +35,7 @@ export const HalftoneCMYK = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
       },
     }), []);
 
-    const { loading, error, channels, naturalWidth, naturalHeight } =
+    const { status, channels, naturalWidth, naturalHeight } =
       useHalftoneCMYK(src, { step, density, shape, cornerRadius, stepBasis, channels: channelsProp });
 
     const dotShape = shape ?? 'circle';
@@ -88,7 +88,7 @@ export const HalftoneCMYK = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
       ctx.globalCompositeOperation = 'source-over';
     }, [channels, dotShape, cr]);
 
-    if (loading || error || !channels || naturalWidth === null || naturalHeight === null) {
+    if (status !== 'ready' || !channels || naturalWidth === null || naturalHeight === null) {
       return null;
     }
 

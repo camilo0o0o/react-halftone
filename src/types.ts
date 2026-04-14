@@ -121,10 +121,15 @@ export interface DisplayDimensions {
 }
 
 /**
+ * Status of halftone generation
+ */
+export type HalftoneStatus = 'idle' | 'loading' | 'processing' | 'ready' | 'error';
+
+/**
  * Return type for the useHalftone hook
  */
 export interface UseHalftoneResult {
-  loading: boolean;
+  status: HalftoneStatus;
   error: Error | null;
   circles: Circle[] | null;
   pathData: string | null;
@@ -215,7 +220,7 @@ export interface CMYKChannelResult {
  * Return type for the useHalftoneCMYK hook
  */
 export interface UseHalftoneCMYKResult {
-  loading: boolean;
+  status: HalftoneStatus;
   error: Error | null;
   channels: Record<CMYKChannel, CMYKChannelResult> | null;
   naturalWidth: number | null;

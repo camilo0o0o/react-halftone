@@ -3,13 +3,13 @@ import React, { createRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { HalftoneCMYK } from '../HalftoneCMYK';
-import type { UseHalftoneCMYKResult, HalftoneCMYKHandle } from '../types';
+import type { UseHalftoneCMYKResult, HalftoneCMYKHandle, HalftoneStatus } from '../types';
 import { useHalftoneCMYK } from '../useHalftoneCMYK';
 
 const defaultChannelCircles = [{ x: 10, y: 10, r: 5 }];
 
 const defaultHookResult: UseHalftoneCMYKResult = {
-  loading: false,
+  status: 'ready' as HalftoneStatus,
   error: null,
   channels: {
     c: { circles: defaultChannelCircles, angle: 15, color: '#00FFFF' },
@@ -97,7 +97,7 @@ function render(el: React.ReactElement) {
 describe('HalftoneCMYK component', () => {
   describe('rendering states', () => {
     it('returns null while loading', () => {
-      mockHookResult = { ...defaultHookResult, loading: true, channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
       render(<HalftoneCMYK src="test.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
@@ -109,7 +109,7 @@ describe('HalftoneCMYK component', () => {
     });
 
     it('returns null on error', () => {
-      mockHookResult = { ...defaultHookResult, error: new Error('fail'), channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: new Error('fail'), channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
       render(<HalftoneCMYK src="bad.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });

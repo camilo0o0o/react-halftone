@@ -16,10 +16,10 @@ export function Halftone({
   className,
   style,
 }: HalftoneProps): JSX.Element | null {
-  const { loading, error, pathData, naturalWidth, naturalHeight } =
+  const { status, pathData, naturalWidth, naturalHeight } =
     useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis });
 
-  if (loading || error || !pathData || naturalWidth === null || naturalHeight === null) {
+  if (status !== 'ready' || !pathData || naturalWidth === null || naturalHeight === null) {
     return null;
   }
 

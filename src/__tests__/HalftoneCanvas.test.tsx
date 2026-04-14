@@ -3,11 +3,11 @@ import React, { createRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { HalftoneCanvas } from '../HalftoneCanvas';
-import type { UseHalftoneResult } from '../types';
+import type { UseHalftoneResult, HalftoneStatus } from '../types';
 import { useHalftone } from '../useHalftone';
 
 const defaultHookResult: UseHalftoneResult = {
-  loading: false,
+  status: 'ready' as HalftoneStatus,
   error: null,
   circles: [{ x: 10, y: 10, r: 5 }],
   pathData: 'M10,10 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 ',
@@ -74,7 +74,7 @@ function render(el: React.ReactElement) {
 describe('HalftoneCanvas component', () => {
   describe('rendering states', () => {
     it('returns null while loading', () => {
-      mockHookResult = { ...defaultHookResult, loading: true, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<HalftoneCanvas src="test.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
@@ -86,13 +86,13 @@ describe('HalftoneCanvas component', () => {
     });
 
     it('returns null on error', () => {
-      mockHookResult = { ...defaultHookResult, error: new Error('fail'), circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: new Error('fail'), circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<HalftoneCanvas src="bad.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
 
     it('returns null when src is empty', () => {
-      mockHookResult = { ...defaultHookResult, loading: false, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'idle' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<HalftoneCanvas src="" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
@@ -226,7 +226,7 @@ describe('HalftoneCanvas component', () => {
 
     it('ref is null when component returns null', () => {
       const ref = createRef<HTMLCanvasElement>();
-      mockHookResult = { ...defaultHookResult, loading: true, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<HalftoneCanvas ref={ref} src="test.png" />);
       expect(ref.current).toBeNull();
     });

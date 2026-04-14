@@ -68,6 +68,10 @@ beforeEach(() => {
     }
     return originalCreateElement(tag, options);
   });
+  vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+    cb(0);
+    return 0;
+  });
 });
 
 afterEach(() => {
@@ -94,11 +98,11 @@ function triggerImageError(index = 0) {
 
 describe('useHalftoneCMYK', () => {
   describe('initial/loading state', () => {
-    it('returns loading state before image loads', () => {
+    it('returns loading status before image loads', () => {
       const { result } = renderHook(() => useHalftoneCMYK('test.png'));
 
       expect(result.current).toEqual({
-        loading: true,
+        status: 'loading',
         error: null,
         channels: null,
         naturalWidth: null,
@@ -113,7 +117,7 @@ describe('useHalftoneCMYK', () => {
       const { result } = renderHook(() => useHalftoneCMYK('test.png'));
       triggerImageLoad();
 
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
       expect(result.current.error).toBeNull();
       expect(result.current.channels).not.toBeNull();
       expect(result.current.channels!.c).toBeDefined();
@@ -168,17 +172,17 @@ describe('useHalftoneCMYK', () => {
       const { result } = renderHook(() => useHalftoneCMYK('test.png'));
       triggerImageLoad();
 
-      // 4 channels × 2 circles each = 8
+      // 4 channels x 2 circles each = 8
       expect(result.current.totalCircleCount).toBe(8);
     });
   });
 
   describe('error handling', () => {
-    it('sets error on image load failure', () => {
+    it('sets error status on image load failure', () => {
       const { result } = renderHook(() => useHalftoneCMYK('bad.png'));
       triggerImageError();
 
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('error');
       expect(result.current.error).toBeInstanceOf(Error);
       expect(result.current.error?.message).toBe('Failed to load image: bad.png');
       expect(result.current.channels).toBeNull();
@@ -193,14 +197,14 @@ describe('useHalftoneCMYK', () => {
         { initialProps: { src: 'first.png' } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ src: 'second.png' });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
     });
 
     it('changing step triggers re-processing', () => {
@@ -209,10 +213,10 @@ describe('useHalftoneCMYK', () => {
         { initialProps: { step: 10 } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ step: 20 });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
     });
   });
 
@@ -225,11 +229,11 @@ describe('useHalftoneCMYK', () => {
 
       rerender({ src: 'second.png' });
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(result.current.channels).toBeNull();
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
       expect(result.current.channels).not.toBeNull();
     });
 
@@ -244,11 +248,11 @@ describe('useHalftoneCMYK', () => {
   });
 
   describe('empty src', () => {
-    it('returns idle state with empty src', () => {
+    it('returns idle status with empty src', () => {
       const { result } = renderHook(() => useHalftoneCMYK(''));
 
       expect(result.current).toEqual({
-        loading: false,
+        status: 'idle',
         error: null,
         channels: null,
         naturalWidth: null,

@@ -35,7 +35,7 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
       [forwardedRef]
     );
 
-    const { loading, error, circles, naturalWidth, naturalHeight } =
+    const { status, circles, naturalWidth, naturalHeight } =
       useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis });
 
     const fillColor = color ?? '#000000';
@@ -75,7 +75,7 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
       }
     }, [circles, fillColor, shape, cornerRadius]);
 
-    if (loading || error || !circles || circles.length === 0 || naturalWidth === null || naturalHeight === null) {
+    if (status !== 'ready' || !circles || circles.length === 0 || naturalWidth === null || naturalHeight === null) {
       return null;
     }
 

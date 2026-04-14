@@ -68,6 +68,10 @@ beforeEach(() => {
     }
     return originalCreateElement(tag, options);
   });
+  vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+    cb(0);
+    return 0;
+  });
 });
 
 afterEach(() => {
@@ -94,11 +98,11 @@ function triggerImageError(index = 0) {
 
 describe('useHalftone', () => {
   describe('initial/loading state', () => {
-    it('returns loading state before image loads', () => {
+    it('returns loading status before image loads', () => {
       const { result } = renderHook(() => useHalftone('test.png'));
 
       expect(result.current).toEqual({
-        loading: true,
+        status: 'loading',
         error: null,
         circles: null,
         pathData: null,
@@ -110,11 +114,11 @@ describe('useHalftone', () => {
   });
 
   describe('successful load', () => {
-    it('returns circles, pathData, and dimensions after load', () => {
+    it('returns ready status with circles and pathData after load', () => {
       const { result } = renderHook(() => useHalftone('test.png'));
       triggerImageLoad();
 
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
       expect(result.current.error).toBeNull();
       expect(result.current.circles).toHaveLength(2);
       expect(result.current.pathData).toContain('M10,10');
@@ -125,11 +129,11 @@ describe('useHalftone', () => {
   });
 
   describe('error handling', () => {
-    it('sets error on image load failure', () => {
+    it('sets error status on image load failure', () => {
       const { result } = renderHook(() => useHalftone('bad.png'));
       triggerImageError();
 
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('error');
       expect(result.current.error).toBeInstanceOf(Error);
       expect(result.current.error?.message).toBe('Failed to load image: bad.png');
       expect(result.current.circles).toBeNull();
@@ -143,7 +147,7 @@ describe('useHalftone', () => {
       const { result } = renderHook(() => useHalftone('test.png', {}));
       triggerImageLoad();
 
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
       expect(result.current.circles).not.toBeNull();
     });
   });
@@ -155,14 +159,14 @@ describe('useHalftone', () => {
         { initialProps: { src: 'first.png' } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ src: 'second.png' });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
     });
 
     it('changing config values triggers re-processing', () => {
@@ -171,10 +175,10 @@ describe('useHalftone', () => {
         { initialProps: { step: 10 } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ step: 20 });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
     });
 
@@ -184,14 +188,14 @@ describe('useHalftone', () => {
         { initialProps: { shape: 'circle' as const } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ shape: 'square' as const });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
     });
 
     it('changing cornerRadius config triggers re-processing', () => {
@@ -200,14 +204,14 @@ describe('useHalftone', () => {
         { initialProps: { cornerRadius: 0 } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ cornerRadius: 50 });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
     });
 
     it('changing invert config triggers re-processing', () => {
@@ -216,14 +220,14 @@ describe('useHalftone', () => {
         { initialProps: { invert: false } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ invert: true });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
     });
 
     it('changing stepBasis config triggers re-processing', () => {
@@ -232,14 +236,14 @@ describe('useHalftone', () => {
         { initialProps: { stepBasis: 'min' as const } }
       );
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
 
       rerender({ stepBasis: 'width' as const });
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
     });
   });
 
@@ -255,12 +259,12 @@ describe('useHalftone', () => {
 
       // Trigger load on first (stale) image — should be ignored
       triggerImageLoad(0);
-      expect(result.current.loading).toBe(true);
+      expect(result.current.status).toBe('loading');
       expect(result.current.circles).toBeNull();
 
       // Trigger load on second image
       triggerImageLoad(1);
-      expect(result.current.loading).toBe(false);
+      expect(result.current.status).toBe('ready');
       expect(result.current.circles).not.toBeNull();
     });
 
@@ -276,11 +280,11 @@ describe('useHalftone', () => {
   });
 
   describe('empty src', () => {
-    it('returns idle state with empty src', () => {
+    it('returns idle status with empty src', () => {
       const { result } = renderHook(() => useHalftone(''));
 
       expect(result.current).toEqual({
-        loading: false,
+        status: 'idle',
         error: null,
         circles: null,
         pathData: null,

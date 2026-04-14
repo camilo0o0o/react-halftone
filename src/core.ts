@@ -100,6 +100,9 @@ export function generateCircles(
       const y = grid.startY + row * grid.stepPx;
 
       const pixel = samplePixelFromBuffer(pixels, x, y, imageWidth, imageHeight);
+      if (!invert && pixel.r > 250 && pixel.g > 250 && pixel.b > 250) continue;
+      if (invert && pixel.r < 5 && pixel.g < 5 && pixel.b < 5) continue;
+
       const greyscale = toGreyscale(pixel.r, pixel.g, pixel.b);
       const brightness = greyscale / 255;
       const factor = invert ? brightness : 1 - brightness;
@@ -314,6 +317,8 @@ export function generateChannelCircles(
 
   for (const pt of gridPoints) {
     const pixel = samplePixelFromBuffer(pixels, pt.x, pt.y, imageWidth, imageHeight);
+    if (pixel.r > 250 && pixel.g > 250 && pixel.b > 250) continue;
+
     const cmyk = rgbToCmyk(pixel.r, pixel.g, pixel.b);
     const radius = maxRadius * cmyk[channel];
 
@@ -323,4 +328,17 @@ export function generateChannelCircles(
   }
 
   return circles;
+}
+
+const DOWNSAMPLE_MIN_STEP_PX = 3;
+const DOWNSAMPLE_MAX_SCALE = 4;
+
+export function computeDownsampleScale(stepPx: number): number {
+  if (stepPx >= DOWNSAMPLE_MIN_STEP_PX) return 1;
+  return Math.min(DOWNSAMPLE_MIN_STEP_PX / stepPx, DOWNSAMPLE_MAX_SCALE);
+}
+
+export function scaleCircles(circles: Circle[], scale: number): Circle[] {
+  if (scale === 1) return circles;
+  return circles.map(c => ({ x: c.x * scale, y: c.y * scale, r: c.r * scale }));
 }
