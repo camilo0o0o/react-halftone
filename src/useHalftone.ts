@@ -42,43 +42,55 @@ export function useHalftone(
       requestAnimationFrame(() => {
         if (cancelled) return;
 
-        const validated = validateConfig(config);
-        const { naturalWidth, naturalHeight } = img;
+        try {
+          const validated = validateConfig(config);
+          const { naturalWidth, naturalHeight } = img;
 
-        const fullGrid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis);
+          const fullGrid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis);
 
-        if (fullGrid.numCols < 1 || fullGrid.numRows < 1) {
+          if (fullGrid.numCols < 1 || fullGrid.numRows < 1) {
+            setState({
+              status: 'ready',
+              error: null,
+              result: { circles: [], pathData: '', naturalWidth, naturalHeight },
+            });
+            return;
+          }
+
+          const scale = computeDownsampleScale(fullGrid.stepPx);
+          const workWidth = Math.round(naturalWidth / scale);
+          const workHeight = Math.round(naturalHeight / scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = workWidth;
+          canvas.height = workHeight;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, workWidth, workHeight);
+
+          const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
+          const grid = scale === 1
+            ? fullGrid
+            : calculateGrid(workWidth, workHeight, validated.step, validated.density, validated.stepBasis);
+          const rawCircles = generateCircles(pixels, workWidth, workHeight, grid, validated.invert, scale);
+          const circles = scaleCircles(rawCircles, scale);
+          const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
+
           setState({
             status: 'ready',
             error: null,
-            result: { circles: [], pathData: '', naturalWidth, naturalHeight },
+            result: { circles, pathData, naturalWidth, naturalHeight },
           });
-          return;
+        } catch (err) {
+          if (cancelled) return;
+          const message = err instanceof Error ? err.message : String(err);
+          setState({
+            status: 'error',
+            error: new Error(
+              `Failed to process image (this often means a cross-origin image without CORS headers): ${message}`
+            ),
+            result: null,
+          });
         }
-
-        const scale = computeDownsampleScale(fullGrid.stepPx);
-        const workWidth = Math.round(naturalWidth / scale);
-        const workHeight = Math.round(naturalHeight / scale);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = workWidth;
-        canvas.height = workHeight;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, workWidth, workHeight);
-
-        const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
-        const grid = scale === 1
-          ? fullGrid
-          : calculateGrid(workWidth, workHeight, validated.step, validated.density, validated.stepBasis);
-        const rawCircles = generateCircles(pixels, workWidth, workHeight, grid, validated.invert);
-        const circles = scaleCircles(rawCircles, scale);
-        const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
-
-        setState({
-          status: 'ready',
-          error: null,
-          result: { circles, pathData, naturalWidth, naturalHeight },
-        });
       });
     };
 

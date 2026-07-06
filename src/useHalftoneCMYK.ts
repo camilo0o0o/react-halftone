@@ -51,64 +51,76 @@ export function useHalftoneCMYK(
       requestAnimationFrame(() => {
         if (cancelled) return;
 
-        const validated = validateCMYKConfig(config);
-        const { naturalWidth, naturalHeight } = img;
+        try {
+          const validated = validateCMYKConfig(config);
+          const { naturalWidth, naturalHeight } = img;
 
-        // Find the smallest stepPx across all channels to determine downsample scale
-        let minStepPx = Infinity;
-        for (const ch of CHANNEL_KEYS) {
-          const chConfig = validated.channels[ch];
-          const { stepPx } = calculateGrid(
-            naturalWidth, naturalHeight,
-            chConfig.step, chConfig.density,
-            validated.stepBasis
-          );
-          if (stepPx < minStepPx) minStepPx = stepPx;
+          // Find the smallest stepPx across all channels to determine downsample scale
+          let minStepPx = Infinity;
+          for (const ch of CHANNEL_KEYS) {
+            const chConfig = validated.channels[ch];
+            const { stepPx } = calculateGrid(
+              naturalWidth, naturalHeight,
+              chConfig.step, chConfig.density,
+              validated.stepBasis
+            );
+            if (stepPx < minStepPx) minStepPx = stepPx;
+          }
+
+          const scale = computeDownsampleScale(minStepPx);
+          const workWidth = Math.round(naturalWidth / scale);
+          const workHeight = Math.round(naturalHeight / scale);
+
+          const canvas = document.createElement('canvas');
+          canvas.width = workWidth;
+          canvas.height = workHeight;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, workWidth, workHeight);
+          const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
+
+          const channels = {} as Record<CMYKChannel, CMYKChannelResult>;
+
+          for (const ch of CHANNEL_KEYS) {
+            const chConfig = validated.channels[ch];
+            const { stepPx, maxRadius } = calculateGrid(
+              workWidth, workHeight,
+              chConfig.step, chConfig.density,
+              validated.stepBasis
+            );
+
+            const gridPoints = generateRotatedGridPoints(
+              workWidth, workHeight,
+              stepPx, chConfig.angle
+            );
+
+            const rawCircles = generateChannelCircles(
+              pixels, workWidth, workHeight,
+              gridPoints, maxRadius, ch, scale
+            );
+
+            channels[ch] = {
+              circles: scaleCircles(rawCircles, scale),
+              angle: chConfig.angle,
+              color: CMYK_CHANNEL_COLORS[ch],
+            };
+          }
+
+          setState({
+            status: 'ready',
+            error: null,
+            result: { channels, naturalWidth, naturalHeight },
+          });
+        } catch (err) {
+          if (cancelled) return;
+          const message = err instanceof Error ? err.message : String(err);
+          setState({
+            status: 'error',
+            error: new Error(
+              `Failed to process image (this often means a cross-origin image without CORS headers): ${message}`
+            ),
+            result: null,
+          });
         }
-
-        const scale = computeDownsampleScale(minStepPx);
-        const workWidth = Math.round(naturalWidth / scale);
-        const workHeight = Math.round(naturalHeight / scale);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = workWidth;
-        canvas.height = workHeight;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, workWidth, workHeight);
-        const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
-
-        const channels = {} as Record<CMYKChannel, CMYKChannelResult>;
-
-        for (const ch of CHANNEL_KEYS) {
-          const chConfig = validated.channels[ch];
-          const { stepPx, maxRadius } = calculateGrid(
-            workWidth, workHeight,
-            chConfig.step, chConfig.density,
-            validated.stepBasis
-          );
-
-          const gridPoints = generateRotatedGridPoints(
-            workWidth, workHeight,
-            stepPx, chConfig.angle
-          );
-
-          const rawCircles = generateChannelCircles(
-            pixels, workWidth, workHeight,
-            gridPoints, maxRadius, ch
-          );
-
-          channels[ch] = {
-            circles: scaleCircles(rawCircles, scale),
-            angle: chConfig.angle,
-            color: CMYK_CHANNEL_COLORS[ch],
-          };
-        }
-
-        setState({
-          status: 'ready',
-          error: null,
-          result: { channels, naturalWidth, naturalHeight },
-        });
       });
     };
 

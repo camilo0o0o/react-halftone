@@ -11,6 +11,7 @@ const MAX_CORNER_RADIUS = 100;
 const VALID_SHAPES: ShapeType[] = ['circle', 'square'];
 
 export function clamp(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
 
@@ -78,7 +79,20 @@ export function samplePixelFromBuffer(
   const px = clamp(Math.round(x), 0, imageWidth - 1);
   const py = clamp(Math.round(y), 0, imageHeight - 1);
   const offset = (py * imageWidth + px) * 4;
-  return { r: pixels[offset], g: pixels[offset + 1], b: pixels[offset + 2] };
+  const r = pixels[offset];
+  const g = pixels[offset + 1];
+  const b = pixels[offset + 2];
+  const a = pixels[offset + 3];
+
+  // Composite over white so transparent regions read as paper, not black ink.
+  if (a === 255) return { r, g, b };
+  const alpha = a / 255;
+  const inv = 255 * (1 - alpha);
+  return {
+    r: r * alpha + inv,
+    g: g * alpha + inv,
+    b: b * alpha + inv,
+  };
 }
 
 export function toGreyscale(r: number, g: number, b: number): number {
@@ -90,7 +104,8 @@ export function generateCircles(
   imageWidth: number,
   imageHeight: number,
   grid: GridConfig,
-  invert: boolean = false
+  invert: boolean = false,
+  scale: number = 1
 ): Circle[] {
   const circles: Circle[] = [];
 
@@ -108,7 +123,9 @@ export function generateCircles(
       const factor = invert ? brightness : 1 - brightness;
       const radius = grid.maxRadius * factor;
 
-      if (radius > MIN_RADIUS) {
+      // Filter against the final (natural-space) radius so downsampling doesn't
+      // inflate the visibility threshold and drop dots.
+      if (radius * scale > MIN_RADIUS) {
         circles.push({ x, y, r: radius });
       }
     }
@@ -257,8 +274,10 @@ export function validateCMYKConfig(props: Partial<HalftoneCMYKProps>): Validated
     const shape = override?.shape && VALID_SHAPES.includes(override.shape)
       ? override.shape
       : globalShape;
+    const rawAngle = override?.angle ?? CMYK_DEFAULT_ANGLES[ch];
+    const angle = Number.isFinite(rawAngle) ? rawAngle : CMYK_DEFAULT_ANGLES[ch];
     channels[ch] = {
-      angle: ((override?.angle ?? CMYK_DEFAULT_ANGLES[ch]) % 360 + 360) % 360,
+      angle: ((angle % 360) + 360) % 360,
       step: clamp(override?.step ?? globalStep, MIN_STEP, MAX_STEP),
       density: clamp(override?.density ?? globalDensity, MIN_DENSITY, MAX_DENSITY),
       shape,
@@ -282,8 +301,13 @@ export function generateRotatedGridPoints(
 
   const normalizedAngle = ((angleDeg % 360) + 360) % 360;
   const theta = (normalizedAngle * Math.PI) / 180;
-  const cosT = Math.cos(theta);
-  const sinT = Math.sin(theta);
+  // Snap near-zero trig so axis-aligned angles (0/90/180/270) don't drop edge
+  // rows to floating-point noise (e.g. Math.cos(Math.PI / 2) ≈ 6.1e-17).
+  const EPSILON = 1e-12;
+  let cosT = Math.cos(theta);
+  let sinT = Math.sin(theta);
+  if (Math.abs(cosT) < EPSILON) cosT = 0;
+  if (Math.abs(sinT) < EPSILON) sinT = 0;
 
   const numSteps = Math.ceil(halfDiag / stepPx);
   const points: Array<{ x: number; y: number }> = [];
@@ -311,7 +335,8 @@ export function generateChannelCircles(
   imageHeight: number,
   gridPoints: Array<{ x: number; y: number }>,
   maxRadius: number,
-  channel: CMYKChannel
+  channel: CMYKChannel,
+  scale: number = 1
 ): Circle[] {
   const circles: Circle[] = [];
 
@@ -322,7 +347,9 @@ export function generateChannelCircles(
     const cmyk = rgbToCmyk(pixel.r, pixel.g, pixel.b);
     const radius = maxRadius * cmyk[channel];
 
-    if (radius > MIN_RADIUS) {
+    // Filter against the final (natural-space) radius so downsampling doesn't
+    // inflate the visibility threshold and drop dots.
+    if (radius * scale > MIN_RADIUS) {
       circles.push({ x: pt.x, y: pt.y, r: radius });
     }
   }
