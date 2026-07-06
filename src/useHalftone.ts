@@ -22,8 +22,9 @@ const CORS_HINT =
 
 export function useHalftone(
   src: string,
-  config: Partial<HalftoneConfig> = {}
+  config: Partial<HalftoneConfig> & { crossOrigin?: string | null } = {}
 ): UseHalftoneResult {
+  const crossOrigin = config.crossOrigin ?? 'anonymous';
   const [state, setState] = useState<State>(IDLE_STATE);
   const loadedRef = useRef<LoadedImage | null>(null);
   const pixelCacheRef = useRef<ExtractedPixels | null>(null);
@@ -55,7 +56,8 @@ export function useHalftone(
       (err) => {
         if (cancelled) return;
         setState({ status: 'error', error: err, result: null });
-      }
+      },
+      crossOrigin
     );
 
     return () => {
@@ -63,7 +65,7 @@ export function useHalftone(
       image.onload = null;
       image.onerror = null;
     };
-  }, [src]);
+  }, [src, crossOrigin]);
 
   // Effect B — compute from the cached image. Reuses the extracted pixel buffer
   // whenever the downsample scale is unchanged, and keeps the previous result

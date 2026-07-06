@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type {
   ShapeType,
   Circle,
@@ -6,6 +6,14 @@ import type {
   CMYKChannel,
   CMYKChannelResult,
 } from './core/types';
+
+/**
+ * Content shown while a component is not yet in the 'ready' state. Either a
+ * static node or a render function receiving the current status and error.
+ */
+export type HalftoneFallback =
+  | ReactNode
+  | ((status: HalftoneStatus, error: Error | null) => ReactNode);
 
 // Re-export the environment-agnostic core types so existing consumers that
 // import them from './types' keep working.
@@ -64,6 +72,15 @@ export interface HalftoneProps {
 
   /** Inline styles */
   style?: CSSProperties;
+
+  /** crossOrigin attribute for the loaded image (default 'anonymous'; null to omit) */
+  crossOrigin?: string | null;
+
+  /** Rendered while not yet ready (loading/processing/error). Defaults to null. */
+  fallback?: HalftoneFallback;
+
+  /** Called when image loading or processing fails. */
+  onError?: (error: Error) => void;
 }
 
 /**
@@ -107,6 +124,12 @@ export interface HalftoneCMYKProps {
   className?: string;
   /** Inline styles */
   style?: CSSProperties;
+  /** crossOrigin attribute for the loaded image (default 'anonymous'; null to omit) */
+  crossOrigin?: string | null;
+  /** Rendered while not yet ready (loading/processing/error). Defaults to null. */
+  fallback?: HalftoneFallback;
+  /** Called when image loading or processing fails. */
+  onError?: (error: Error) => void;
 }
 
 /**

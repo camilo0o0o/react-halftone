@@ -1,7 +1,9 @@
 import { forwardRef, useRef, useEffect, useCallback } from 'react';
+import type { ReactElement } from 'react';
 import type { HalftoneProps } from './types';
 import { calculateDisplayDimensions } from './core';
 import { useHalftone } from './useHalftone';
+import { resolveFallback, useOnError } from './fallback';
 
 export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
   function HalftoneCanvas(
@@ -14,10 +16,13 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
       shape,
       cornerRadius,
       stepBasis,
+      crossOrigin,
       width: propWidth,
       height: propHeight,
       className,
       style,
+      fallback,
+      onError,
     },
     forwardedRef
   ) {
@@ -35,8 +40,10 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
       [forwardedRef]
     );
 
-    const { status, circles, naturalWidth, naturalHeight } =
-      useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis });
+    const { status, error, circles, naturalWidth, naturalHeight } =
+      useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis, crossOrigin });
+
+    useOnError(status, error, onError);
 
     const fillColor = color ?? '#000000';
 
@@ -76,7 +83,7 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
     }, [circles, fillColor, shape, cornerRadius]);
 
     if (status !== 'ready' || !circles || circles.length === 0 || naturalWidth === null || naturalHeight === null) {
-      return null;
+      return (resolveFallback(fallback, status, error) as ReactElement | null) ?? null;
     }
 
     const dims = calculateDisplayDimensions(naturalWidth, naturalHeight, propWidth, propHeight);

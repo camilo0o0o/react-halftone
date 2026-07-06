@@ -1,7 +1,9 @@
 import { forwardRef, useRef, useEffect, useImperativeHandle } from 'react';
+import type { ReactElement } from 'react';
 import type { HalftoneCMYKProps, HalftoneCMYKHandle, CMYKChannel } from './types';
 import { calculateDisplayDimensions } from './core';
 import { useHalftoneCMYK } from './useHalftoneCMYK';
+import { resolveFallback, useOnError } from './fallback';
 
 const DRAW_ORDER: CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
@@ -14,11 +16,14 @@ export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKPro
       shape,
       cornerRadius,
       stepBasis,
+      crossOrigin,
       channels: channelsProp,
       width: propWidth,
       height: propHeight,
       className,
       style,
+      fallback,
+      onError,
     },
     ref
   ) {
@@ -36,8 +41,10 @@ export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKPro
       getCanvas: () => canvasRef.current,
     }), []);
 
-    const { status, channels, naturalWidth, naturalHeight } =
-      useHalftoneCMYK(src, { step, density, shape, cornerRadius, stepBasis, channels: channelsProp });
+    const { status, error, channels, naturalWidth, naturalHeight } =
+      useHalftoneCMYK(src, { step, density, shape, cornerRadius, stepBasis, crossOrigin, channels: channelsProp });
+
+    useOnError(status, error, onError);
 
     const dotShape = shape ?? 'circle';
     const cr = cornerRadius ?? 0;
@@ -86,7 +93,7 @@ export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKPro
     }, [channels, dotShape, cr]);
 
     if (status !== 'ready' || !channels || naturalWidth === null || naturalHeight === null) {
-      return null;
+      return (resolveFallback(fallback, status, error) as ReactElement | null) ?? null;
     }
 
     const dims = calculateDisplayDimensions(naturalWidth, naturalHeight, propWidth, propHeight);

@@ -1,132 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  HalftoneCanvas,
-  useHalftoneCMYK,
-} from 'react-halftone';
-import type { HalftoneCMYKHandle, ShapeType, CMYKChannel } from 'react-halftone';
+import { useState, useRef } from 'react';
+import { HalftoneCanvas, HalftoneCMYKCanvas } from 'react-halftone';
+import type { HalftoneCMYKHandle, ShapeType } from 'react-halftone';
 
 type Mode = 'mono' | 'cmyk';
-
-const DRAW_ORDER: CMYKChannel[] = ['c', 'm', 'y', 'k'];
-
-function CMYKPreview({
-  src,
-  step,
-  density,
-  shape,
-  cornerRadius,
-  channels,
-  width,
-  cmykRef,
-}: {
-  src: string;
-  step: number;
-  density: number;
-  shape: ShapeType;
-  cornerRadius: number;
-  channels: { c: { angle: number }; m: { angle: number }; y: { angle: number }; k: { angle: number } };
-  width: number;
-  cmykRef: React.RefObject<HalftoneCMYKHandle | null>;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const { status, channels: chData, naturalWidth, naturalHeight } =
-    useHalftoneCMYK(src, { step, density, shape, cornerRadius, channels });
-
-  // Imperative handle for export
-  const mergedRef = useCallback(
-    (node: HTMLCanvasElement | null) => {
-      canvasRef.current = node;
-    },
-    []
-  );
-
-  // Expose export methods via cmykRef
-  useEffect(() => {
-    if (!cmykRef) return;
-    const handle: HalftoneCMYKHandle = {
-      toDataURL: (type?: string, quality?: number) => {
-        if (!canvasRef.current) throw new Error('Canvas not available');
-        return canvasRef.current.toDataURL(type, quality);
-      },
-      toBlob: (callback: BlobCallback, type?: string, quality?: number) => {
-        if (!canvasRef.current) throw new Error('Canvas not available');
-        canvasRef.current.toBlob(callback, type, quality);
-      },
-    };
-    (cmykRef as React.MutableRefObject<HalftoneCMYKHandle | null>).current = handle;
-  }, [cmykRef]);
-
-  // Draw channels to canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !chData) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'multiply';
-
-    const cr = cornerRadius ?? 0;
-
-    for (const ch of DRAW_ORDER) {
-      const { circles, color } = chData[ch];
-      if (circles.length === 0) continue;
-
-      ctx.fillStyle = color;
-
-      if (shape === 'circle') {
-        ctx.beginPath();
-        for (const c of circles) {
-          ctx.moveTo(c.x + c.r, c.y);
-          ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-        }
-        ctx.fill();
-      } else if (cr <= 0) {
-        for (const c of circles) {
-          ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
-        }
-      } else {
-        for (const c of circles) {
-          const radius = c.r * (cr / 100);
-          const side = c.r * 2;
-          ctx.beginPath();
-          ctx.roundRect(c.x - c.r, c.y - c.r, side, side, radius);
-          ctx.fill();
-        }
-      }
-    }
-
-    ctx.globalCompositeOperation = 'source-over';
-  }, [chData, shape, cornerRadius]);
-
-  if (status === 'loading') {
-    return <p className="status-text">Loading image...</p>;
-  }
-
-  if (status === 'processing') {
-    return <p className="status-text">Generating halftone...</p>;
-  }
-
-  if (status === 'error' || status === 'idle' || !chData || !naturalWidth || !naturalHeight) {
-    return null;
-  }
-
-  const aspectRatio = naturalWidth / naturalHeight;
-  const displayWidth = width;
-  const displayHeight = displayWidth / aspectRatio;
-
-  return (
-    <canvas
-      ref={mergedRef}
-      width={naturalWidth}
-      height={naturalHeight}
-      style={{ width: displayWidth, height: displayHeight }}
-    />
-  );
-}
 
 export function App() {
   const cmykRef = useRef<HalftoneCMYKHandle>(null);
@@ -374,9 +250,17 @@ export function App() {
             shape={shape}
             cornerRadius={cornerRadius}
             width={700}
+            fallback={(status) =>
+              status === 'loading' ? (
+                <p className="status-text">Loading image…</p>
+              ) : status === 'processing' ? (
+                <p className="status-text">Generating halftone…</p>
+              ) : null
+            }
           />
         ) : (
-          <CMYKPreview
+          <HalftoneCMYKCanvas
+            ref={cmykRef}
             src={imageSrc}
             step={step}
             density={density}
@@ -389,7 +273,13 @@ export function App() {
               k: { angle: angleK },
             }}
             width={700}
-            cmykRef={cmykRef}
+            fallback={(status) =>
+              status === 'loading' ? (
+                <p className="status-text">Loading image…</p>
+              ) : status === 'processing' ? (
+                <p className="status-text">Generating halftone…</p>
+              ) : null
+            }
           />
         )}
       </div>

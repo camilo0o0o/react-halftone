@@ -19,6 +19,7 @@ export type { CMYK } from './core';
 export type {
   HalftoneProps, HalftoneCanvasProps, UseHalftoneResult,
   HalftoneCMYKProps, HalftoneCMYKHandle, UseHalftoneCMYKResult,
+  HalftoneFallback,
 } from './types';
 
 // Shared config / data types

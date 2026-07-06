@@ -34,8 +34,9 @@ const CORS_HINT =
 
 export function useHalftoneCMYK(
   src: string,
-  config: Partial<HalftoneCMYKConfig> = {}
+  config: Partial<HalftoneCMYKConfig> & { crossOrigin?: string | null } = {}
 ): UseHalftoneCMYKResult {
+  const crossOrigin = config.crossOrigin ?? 'anonymous';
   const [state, setState] = useState<State>(IDLE_STATE);
   const loadedRef = useRef<LoadedImage | null>(null);
   const pixelCacheRef = useRef<ExtractedPixels | null>(null);
@@ -66,7 +67,8 @@ export function useHalftoneCMYK(
       (err) => {
         if (cancelled) return;
         setState({ status: 'error', error: err, result: null });
-      }
+      },
+      crossOrigin
     );
 
     return () => {
@@ -74,7 +76,7 @@ export function useHalftoneCMYK(
       image.onload = null;
       image.onerror = null;
     };
-  }, [src]);
+  }, [src, crossOrigin]);
 
   // Effect B — compute from the cached image. Because the pixel buffer is keyed
   // on the downsample scale (driven by step/density, not angle), dragging a

@@ -231,4 +231,40 @@ describe('HalftoneCanvas component', () => {
       expect(ref.current).toBeNull();
     });
   });
+
+  describe('fallback and onError', () => {
+    it('renders a static fallback node while not ready', () => {
+      mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      render(<HalftoneCanvas src="test.png" fallback={<span className="ph">wait</span>} />);
+      expect(container.querySelector('.ph')?.textContent).toBe('wait');
+      expect(container.querySelector('canvas')).toBeNull();
+    });
+
+    it('renders a fallback render-function with the current status', () => {
+      mockHookResult = { ...defaultHookResult, status: 'processing' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      render(<HalftoneCanvas src="test.png" fallback={(status) => <span className="ph">{status}</span>} />);
+      expect(container.querySelector('.ph')?.textContent).toBe('processing');
+    });
+
+    it('returns null (no fallback provided) while not ready', () => {
+      mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      render(<HalftoneCanvas src="test.png" />);
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(container.firstChild).toBeNull();
+    });
+
+    it('calls onError when the hook reports an error', () => {
+      const onError = vi.fn();
+      const err = new Error('boom');
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: err, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      render(<HalftoneCanvas src="bad.png" onError={onError} />);
+      expect(onError).toHaveBeenCalledWith(err);
+    });
+
+    it('does not call onError on a normal ready render', () => {
+      const onError = vi.fn();
+      render(<HalftoneCanvas src="test.png" onError={onError} />);
+      expect(onError).not.toHaveBeenCalled();
+    });
+  });
 });
