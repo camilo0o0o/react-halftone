@@ -318,20 +318,18 @@ describe('calculateDisplayDimensions', () => {
 });
 
 describe('computeDownsampleScale', () => {
-  it('returns 1 when stepPx >= threshold (3)', () => {
-    expect(computeDownsampleScale(3)).toBe(1);
-    expect(computeDownsampleScale(5)).toBe(1);
-    expect(computeDownsampleScale(10)).toBe(1);
+  // Target is ~3.5 source pixels per grid cell: scale = max(1, stepPx / 3.5).
+  it('returns 1 when cells are at/below the target size', () => {
+    expect(computeDownsampleScale(3.5)).toBe(1);
+    expect(computeDownsampleScale(1.5)).toBe(1);
+    expect(computeDownsampleScale(1)).toBe(1);
+    expect(computeDownsampleScale(0.1)).toBe(1);
   });
 
-  it('returns scale when stepPx < threshold', () => {
-    expect(computeDownsampleScale(1.5)).toBeCloseTo(2);
-    expect(computeDownsampleScale(1)).toBeCloseTo(3);
-  });
-
-  it('caps at maxScale of 4', () => {
-    expect(computeDownsampleScale(0.1)).toBe(4);
-    expect(computeDownsampleScale(0.01)).toBe(4);
+  it('downsamples proportionally as cell size grows', () => {
+    expect(computeDownsampleScale(7)).toBeCloseTo(2);
+    expect(computeDownsampleScale(35)).toBeCloseTo(10);
+    expect(computeDownsampleScale(350)).toBeCloseTo(100);
   });
 });
 

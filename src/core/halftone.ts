@@ -293,12 +293,17 @@ export function generateChannelCircles(
   return circles;
 }
 
-const DOWNSAMPLE_MIN_STEP_PX = 3;
-const DOWNSAMPLE_MAX_SCALE = 4;
+// Target number of source pixels per grid cell in the downsampled work buffer.
+// Keeping this constant makes processing cost track the dot count rather than
+// the source resolution: a 24MP photo and a 1MP photo at the same `step` do the
+// same amount of work. The `drawImage` downscale also area-averages each cell,
+// which is exactly the tone a halftone dot should represent.
+const TARGET_CELL_PX = 3.5;
 
 export function computeDownsampleScale(stepPx: number): number {
-  if (stepPx >= DOWNSAMPLE_MIN_STEP_PX) return 1;
-  return Math.min(DOWNSAMPLE_MIN_STEP_PX / stepPx, DOWNSAMPLE_MAX_SCALE);
+  if (!Number.isFinite(stepPx) || stepPx <= 0) return 1;
+  // Never upsample: cells already at/below the target stay at natural resolution.
+  return Math.max(1, stepPx / TARGET_CELL_PX);
 }
 
 export function scaleCircles(circles: Circle[], scale: number): Circle[] {

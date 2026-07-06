@@ -109,17 +109,31 @@ describe('scaleCircles', () => {
 });
 
 describe('computeDownsampleScale contract', () => {
-  it('does not downsample when step is already large enough', () => {
-    expect(computeDownsampleScale(3)).toBe(1);
-    expect(computeDownsampleScale(10)).toBe(1);
+  it('does not downsample when cells are already at/below the target size', () => {
+    expect(computeDownsampleScale(3.5)).toBe(1);
+    expect(computeDownsampleScale(1)).toBe(1);
+    expect(computeDownsampleScale(0.01)).toBe(1);
   });
 
-  it('downsamples proportionally for tiny steps', () => {
-    expect(computeDownsampleScale(1.5)).toBeCloseTo(2);
+  it('downsamples proportionally as step (cell size) grows', () => {
+    // scale = stepPx / 3.5
+    expect(computeDownsampleScale(7)).toBeCloseTo(2);
+    expect(computeDownsampleScale(35)).toBeCloseTo(10);
   });
 
-  it('caps the scale factor', () => {
-    expect(computeDownsampleScale(0.01)).toBeLessThanOrEqual(4);
+  it('cost tracks dot count: work width stays ~constant per cell', () => {
+    // A big and a small image at the same step produce similar work buffers.
+    const bigStep = 400; // e.g. 4000px image, step 10%
+    const scale = computeDownsampleScale(bigStep);
+    const workWidth = Math.round(4000 / scale);
+    // ~3.5 px per cell * (4000/400 = 10 cells) ≈ 35 px
+    expect(workWidth).toBeLessThan(60);
+  });
+
+  it('is safe for non-finite or non-positive input', () => {
+    expect(computeDownsampleScale(NaN)).toBe(1);
+    expect(computeDownsampleScale(0)).toBe(1);
+    expect(computeDownsampleScale(-5)).toBe(1);
   });
 });
 

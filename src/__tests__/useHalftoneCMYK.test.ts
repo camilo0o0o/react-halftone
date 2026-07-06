@@ -204,7 +204,8 @@ describe('useHalftoneCMYK', () => {
       expect(result.current.status).toBe('ready');
     });
 
-    it('changing step triggers re-processing', () => {
+    // Config changes recompute from the cached image WITHOUT reloading it.
+    it('changing step recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
         ({ step }) => useHalftoneCMYK('test.png', { step }),
         { initialProps: { step: 10 } }
@@ -213,7 +214,21 @@ describe('useHalftoneCMYK', () => {
       expect(result.current.status).toBe('ready');
 
       rerender({ step: 20 });
-      expect(result.current.status).toBe('loading');
+      expect(result.current.status).toBe('ready');
+      expect(mockImageInstances).toHaveLength(1);
+    });
+
+    it('changing a channel angle recomputes without reloading the image', () => {
+      const { result, rerender } = renderHook(
+        ({ angle }) => useHalftoneCMYK('test.png', { channels: { c: { angle } } }),
+        { initialProps: { angle: 15 } }
+      );
+      triggerImageLoad(0);
+      expect(result.current.status).toBe('ready');
+
+      rerender({ angle: 30 });
+      expect(result.current.status).toBe('ready');
+      expect(mockImageInstances).toHaveLength(1);
     });
   });
 

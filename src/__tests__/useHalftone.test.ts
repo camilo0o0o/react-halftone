@@ -162,7 +162,9 @@ describe('useHalftone', () => {
       expect(result.current.status).toBe('ready');
     });
 
-    it('changing config values triggers re-processing', () => {
+    // Config changes recompute from the cached image WITHOUT reloading it —
+    // this is the realtime perf win (no re-fetch/re-decode per slider tick).
+    it('changing step recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
         ({ step }) => useHalftone('test.png', { step }),
         { initialProps: { step: 10 } }
@@ -171,11 +173,11 @@ describe('useHalftone', () => {
       expect(result.current.status).toBe('ready');
 
       rerender({ step: 20 });
-      expect(result.current.status).toBe('loading');
-      expect(mockImageInstances).toHaveLength(2);
+      expect(result.current.status).toBe('ready');
+      expect(mockImageInstances).toHaveLength(1);
     });
 
-    it('changing shape config triggers re-processing', () => {
+    it('changing shape recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
         ({ shape }: { shape: 'circle' | 'square' }) => useHalftone('test.png', { shape }),
         { initialProps: { shape: 'circle' as 'circle' | 'square' } }
@@ -184,30 +186,11 @@ describe('useHalftone', () => {
       expect(result.current.status).toBe('ready');
 
       rerender({ shape: 'square' as const });
-      expect(result.current.status).toBe('loading');
-      expect(mockImageInstances).toHaveLength(2);
-
-      triggerImageLoad(1);
       expect(result.current.status).toBe('ready');
+      expect(mockImageInstances).toHaveLength(1);
     });
 
-    it('changing cornerRadius config triggers re-processing', () => {
-      const { result, rerender } = renderHook(
-        ({ cornerRadius }) => useHalftone('test.png', { shape: 'square', cornerRadius }),
-        { initialProps: { cornerRadius: 0 } }
-      );
-      triggerImageLoad(0);
-      expect(result.current.status).toBe('ready');
-
-      rerender({ cornerRadius: 50 });
-      expect(result.current.status).toBe('loading');
-      expect(mockImageInstances).toHaveLength(2);
-
-      triggerImageLoad(1);
-      expect(result.current.status).toBe('ready');
-    });
-
-    it('changing invert config triggers re-processing', () => {
+    it('changing invert recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
         ({ invert }) => useHalftone('test.png', { invert }),
         { initialProps: { invert: false } }
@@ -216,14 +199,11 @@ describe('useHalftone', () => {
       expect(result.current.status).toBe('ready');
 
       rerender({ invert: true });
-      expect(result.current.status).toBe('loading');
-      expect(mockImageInstances).toHaveLength(2);
-
-      triggerImageLoad(1);
       expect(result.current.status).toBe('ready');
+      expect(mockImageInstances).toHaveLength(1);
     });
 
-    it('changing stepBasis config triggers re-processing', () => {
+    it('changing stepBasis recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
         ({ stepBasis }: { stepBasis: 'min' | 'width' }) => useHalftone('test.png', { stepBasis }),
         { initialProps: { stepBasis: 'min' as 'min' | 'width' } }
@@ -232,11 +212,8 @@ describe('useHalftone', () => {
       expect(result.current.status).toBe('ready');
 
       rerender({ stepBasis: 'width' as const });
-      expect(result.current.status).toBe('loading');
-      expect(mockImageInstances).toHaveLength(2);
-
-      triggerImageLoad(1);
       expect(result.current.status).toBe('ready');
+      expect(mockImageInstances).toHaveLength(1);
     });
   });
 
