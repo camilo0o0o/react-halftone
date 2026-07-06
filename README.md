@@ -2,6 +2,8 @@
 
 A React component and hook that converts images into halftone effects. It samples pixel brightness from an image and renders a grid of shapes — darker areas produce larger shapes, lighter areas produce smaller ones. Supports SVG and Canvas output, CMYK color separation with per-channel angle control, circle and square dot shapes, optional rounded corners on squares, and inverted mode for light-on-dark designs.
 
+Generation runs **in the browser in realtime** (React components + hooks) or **at build time in Node** (`react-halftone/node`) for images that don't need realtime processing — both driven by the same pure, dependency-free core (`react-halftone/core`), so output is identical across environments.
+
 ![halftone_gif](https://github.com/user-attachments/assets/f1be70b2-84e4-4773-9f63-81335fb911eb)
 
 ## Install
@@ -10,7 +12,19 @@ A React component and hook that converts images into halftone effects. It sample
 npm install github:camilo0o0o/react-halftone
 ```
 
-Requires React 18+.
+Requires React 18+. The build-time entry (`react-halftone/node`) additionally needs [`sharp`](https://sharp.pixelplumbing.com/), declared as an **optional** peer dependency — install it only if you use the Node API:
+
+```bash
+npm install sharp
+```
+
+The package ships three entry points:
+
+| Import | Contents | Environment |
+|--------|----------|-------------|
+| `react-halftone` | Components + hooks | Browser (React) |
+| `react-halftone/core` | Pure compute + SVG renderers | Any (no React, no DOM) |
+| `react-halftone/node` | `halftone*To{SVG,PNG}` | Node (needs `sharp`) |
 
 ## Usage
 
@@ -75,18 +89,18 @@ const canvasRef = useRef<HTMLCanvasElement>(null);
 // canvasRef.current.toDataURL('image/png')
 ```
 
-### `HalftoneCMYK` component
+### `HalftoneCMYKCanvas` component
 
 Canvas-based CMYK halftone that separates the image into Cyan, Magenta, Yellow, and Black channels. Each channel is rendered as a rotated dot grid at traditional print screen angles, then composited with multiply blending for a realistic color halftone effect.
 
 ```tsx
-import { HalftoneCMYK } from 'react-halftone';
+import { HalftoneCMYKCanvas } from 'react-halftone';
 
 {/* Minimal — defaults handle angles, density, everything */}
-<HalftoneCMYK src="/photo.jpg" step={3} />
+<HalftoneCMYKCanvas src="/photo.jpg" step={3} />
 
 {/* Override individual channel angles */}
-<HalftoneCMYK
+<HalftoneCMYKCanvas
   src="/photo.jpg"
   step={3}
   channels={{
@@ -98,7 +112,7 @@ import { HalftoneCMYK } from 'react-halftone';
 />
 
 {/* Per-channel density and step overrides */}
-<HalftoneCMYK
+<HalftoneCMYKCanvas
   src="/photo.jpg"
   step={4}
   density={80}
@@ -113,7 +127,7 @@ Export the result as PNG or JPEG using the imperative handle:
 
 ```tsx
 import { useRef } from 'react';
-import { HalftoneCMYK } from 'react-halftone';
+import { HalftoneCMYKCanvas } from 'react-halftone';
 import type { HalftoneCMYKHandle } from 'react-halftone';
 
 function MyComponent() {
@@ -126,7 +140,7 @@ function MyComponent() {
 
   return (
     <>
-      <HalftoneCMYK ref={ref} src="/photo.jpg" step={3} />
+      <HalftoneCMYKCanvas ref={ref} src="/photo.jpg" step={3} />
       <button onClick={handleExport}>Export</button>
     </>
   );
@@ -201,6 +215,55 @@ const cmyk = rgbToCmyk(255, 100, 50);
 // { c: 0, m: 0.608, y: 0.804, k: 0 }
 ```
 
+## Build-time generation (Node)
+
+For images that don't need realtime processing, precompute the halftone during a build step and ship the static SVG or PNG. The `react-halftone/node` entry decodes with [`sharp`](https://sharp.pixelplumbing.com/) (an optional peer dependency) and runs the **same core** as the browser, so the output matches.
+
+```ts
+// scripts/generate-halftones.mjs
+import { writeFile } from 'node:fs/promises';
+import {
+  halftoneToSVG,
+  halftoneToPNG,
+  halftoneCMYKToSVG,
+  halftoneCMYKToPNG,
+} from 'react-halftone/node';
+
+// Input can be a file path, a Buffer, or a Uint8Array.
+const svg = await halftoneToSVG('photo.jpg', { step: 4, color: '#000000' });
+await writeFile('out/photo.svg', svg);
+
+const png = await halftoneToPNG('photo.jpg', { step: 4 });
+await writeFile('out/photo.png', png);
+
+// CMYK — SVG uses mix-blend-mode:multiply; PNG composites channels with sharp.
+const cmykSvg = await halftoneCMYKToSVG('photo.jpg', { step: 3 });
+await writeFile('out/photo-cmyk.svg', cmykSvg);
+
+const cmykPng = await halftoneCMYKToPNG('photo.jpg', { step: 3 });
+await writeFile('out/photo-cmyk.png', cmykPng);
+```
+
+| Function | Returns | Config |
+|----------|---------|--------|
+| `halftoneToSVG(input, config?)` | `Promise<string>` | `Partial<HalftoneConfig>` |
+| `halftoneToPNG(input, config?)` | `Promise<Buffer>` | `Partial<HalftoneConfig>` |
+| `halftoneCMYKToSVG(input, config?)` | `Promise<string>` | `Partial<HalftoneCMYKConfig>` |
+| `halftoneCMYKToPNG(input, config?)` | `Promise<Buffer>` | `Partial<HalftoneCMYKConfig>` |
+
+`input` is a file path, `Buffer`, or `Uint8Array`. All four accept the same config options as the corresponding browser components.
+
+### Pure core (`react-halftone/core`)
+
+If you already have raw RGBA pixels (from a worker, a different image loader, or your own canvas), the framework-agnostic core computes halftones with no React and no DOM:
+
+```ts
+import { computeHalftoneCMYK, renderHalftoneCMYKSVG } from 'react-halftone/core';
+
+const { channels } = computeHalftoneCMYK(pixels, width, height, /* scale */ 1, { step: 3 });
+const svg = renderHalftoneCMYKSVG(channels, { width, height });
+```
+
 ## Props
 
 ### `Halftone` / `HalftoneCanvas` component props
@@ -221,11 +284,14 @@ Both components accept the same props:
 | `height` | `number` | natural height | Display height in pixels |
 | `className` | `string` | — | CSS class for the element |
 | `style` | `CSSProperties` | — | Inline styles for the element |
+| `crossOrigin` | `string \| null` | `'anonymous'` | crossOrigin attribute for the loaded image (`null` to omit) |
+| `fallback` | `ReactNode \| ((status, error) => ReactNode)` | — | Rendered while not ready (loading/processing/error). Defaults to nothing. |
+| `onError` | `(error: Error) => void` | — | Called when image loading or processing fails |
 | `ref` | `Ref<HTMLCanvasElement>` | — | (`HalftoneCanvas` only) Ref to the canvas element |
 
 If both `width` and `height` are provided, the image scales to fit within those bounds while preserving aspect ratio. If only one is provided, the other is calculated automatically.
 
-### `HalftoneCMYK` component props
+### `HalftoneCMYKCanvas` component props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -240,6 +306,9 @@ If both `width` and `height` are provided, the image scales to fit within those 
 | `height` | `number` | natural height | Display height in pixels |
 | `className` | `string` | — | CSS class for the canvas |
 | `style` | `CSSProperties` | — | Inline styles for the canvas |
+| `crossOrigin` | `string \| null` | `'anonymous'` | crossOrigin attribute for the loaded image (`null` to omit) |
+| `fallback` | `ReactNode \| ((status, error) => ReactNode)` | — | Rendered while not ready (loading/processing/error) |
+| `onError` | `(error: Error) => void` | — | Called when image loading or processing fails |
 | `ref` | `Ref<HalftoneCMYKHandle>` | — | Imperative handle for export |
 
 **`channels` prop:**
@@ -248,12 +317,14 @@ Each channel (`c`, `m`, `y`, `k`) accepts optional overrides. Omitted fields fal
 
 ```ts
 {
-  c?: { angle?: number; step?: number; density?: number; shape?: ShapeType; cornerRadius?: number };
+  c?: { angle?: number; step?: number; density?: number };
   m?: { ... };
   y?: { ... };
   k?: { ... };
 }
 ```
+
+`shape` and `cornerRadius` are global (all-or-nothing across channels) — set them as top-level props, not per channel.
 
 Default angles: **C=15°, M=75°, Y=0°, K=45°** (traditional print screen angles, 30° apart for the three most visible inks to avoid moire patterns).
 
@@ -263,6 +334,7 @@ Default angles: **C=15°, M=75°, Y=0°, K=45°** (traditional print screen angl
 |--------|-----------|-------------|
 | `toDataURL` | `(type?: string, quality?: number) => string` | Export canvas as data URL |
 | `toBlob` | `(callback: BlobCallback, type?: string, quality?: number) => void` | Export canvas as Blob |
+| `getCanvas` | `() => HTMLCanvasElement \| null` | The underlying canvas element (null before mount) |
 
 ### `useHalftone` hook
 
@@ -301,10 +373,10 @@ The hook re-runs when `src`, `step`, `density`, `color`, `invert`, `shape`, `cor
 ### `useHalftoneCMYK` hook
 
 ```ts
-function useHalftoneCMYK(src: string, config?: Partial<HalftoneCMYKProps>): UseHalftoneCMYKResult
+function useHalftoneCMYK(src: string, config?: Partial<HalftoneCMYKConfig>): UseHalftoneCMYKResult
 ```
 
-Accepts the same config as `HalftoneCMYKProps` (excluding `className`, `style`, `ref`). Returns per-channel circle data.
+Accepts `step`, `density`, `shape`, `cornerRadius`, `stepBasis`, `channels`, and `crossOrigin`. Returns per-channel circle data.
 
 **Return value (`UseHalftoneCMYKResult`):**
 
@@ -334,10 +406,11 @@ import type {
   // Monochrome
   HalftoneProps, HalftoneCanvasProps, HalftoneConfig,
   Circle, UseHalftoneResult, HalftoneStatus, ShapeType,
+  HalftoneFallback, HalftoneResult,
   // CMYK
-  CMYKChannel, CMYKChannelConfig, CMYKChannelsConfig,
+  CMYKChannel, CMYKChannelConfig, CMYKChannelsConfig, HalftoneCMYKConfig,
   HalftoneCMYKProps, HalftoneCMYKHandle,
-  UseHalftoneCMYKResult, CMYKChannelResult,
+  UseHalftoneCMYKResult, CMYKChannelResult, HalftoneCMYKResult,
   CMYK,
 } from 'react-halftone';
 ```
@@ -376,13 +449,12 @@ interface CMYKChannelConfig {
   angle?: number;         // Rotation angle in degrees
   step?: number;          // Grid spacing override
   density?: number;       // Max dot size override
-  shape?: ShapeType;      // Shape override
-  cornerRadius?: number;  // Corner radius override
 }
 
 interface HalftoneCMYKHandle {
   toDataURL: (type?: string, quality?: number) => string;
   toBlob: (callback: BlobCallback, type?: string, quality?: number) => void;
+  getCanvas: () => HTMLCanvasElement | null;
 }
 ```
 
@@ -403,6 +475,15 @@ interface HalftoneCMYKHandle {
 3. For each channel, generates a dot grid rotated to that channel's screen angle. Default angles (C=15°, M=75°, Y=0°, K=45°) are spaced 30° apart for the three most visible inks to create pleasing rosette patterns instead of moire interference
 4. Each channel's dot sizes are proportional to its CMYK intensity at that grid point — higher ink values produce larger dots
 5. The four channel layers are composited onto a white canvas using `globalCompositeOperation: 'multiply'`, simulating how transparent inks layer in print
+
+### Performance
+
+The hooks are built for smooth realtime interaction:
+
+- **The decoded image is cached per `src`** — dragging a config slider recomputes without re-fetching or re-decoding the image.
+- **The extracted pixel buffer is cached per downsample scale** — changing a CMYK channel angle (which doesn't change the scale) reuses the buffer and skips `getImageData` entirely.
+- **Resolution-aware downsampling** targets a constant number of source pixels per grid cell, so processing cost tracks the dot count rather than the source resolution — a 24MP photo and a 1MP photo do comparable work at the same `step`. The downscale also area-averages each cell, which is the tone a halftone dot should represent.
+- The previous result stays on screen while recomputing, so the output never flickers mid-drag.
 
 ## Example app
 
