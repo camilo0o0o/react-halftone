@@ -1,12 +1,12 @@
-import { forwardRef, useRef, useEffect, useCallback, useImperativeHandle } from 'react';
+import { forwardRef, useRef, useEffect, useImperativeHandle } from 'react';
 import type { HalftoneCMYKProps, HalftoneCMYKHandle, CMYKChannel } from './types';
 import { calculateDisplayDimensions } from './core';
 import { useHalftoneCMYK } from './useHalftoneCMYK';
 
 const DRAW_ORDER: CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
-export const HalftoneCMYK = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
-  function HalftoneCMYK(
+export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
+  function HalftoneCMYKCanvas(
     {
       src,
       step,
@@ -33,6 +33,7 @@ export const HalftoneCMYK = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
         if (!canvasRef.current) throw new Error('Canvas not available');
         canvasRef.current.toBlob(callback, type, quality);
       },
+      getCanvas: () => canvasRef.current,
     }), []);
 
     const { status, channels, naturalWidth, naturalHeight } =
@@ -48,7 +49,7 @@ export const HalftoneCMYK = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // White background is required for multiply blending
+      // White background is required for multiply blending.
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.globalCompositeOperation = 'multiply';
@@ -57,32 +58,28 @@ export const HalftoneCMYK = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
         const { circles, color } = channels[ch];
         if (circles.length === 0) continue;
 
-        // Resolve per-channel shape (fall back to global)
-        const chShape = dotShape;
-        const chCr = cr;
-
         ctx.fillStyle = color;
+        ctx.beginPath();
 
-        if (chShape === 'circle') {
-          ctx.beginPath();
+        if (dotShape === 'circle') {
           for (const c of circles) {
             ctx.moveTo(c.x + c.r, c.y);
             ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
           }
-          ctx.fill();
-        } else if (chCr <= 0) {
+        } else if (cr <= 0) {
           for (const c of circles) {
-            ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+            ctx.rect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
           }
         } else {
           for (const c of circles) {
-            const radius = c.r * (chCr / 100);
-            const side = c.r * 2;
-            ctx.beginPath();
-            ctx.roundRect(c.x - c.r, c.y - c.r, side, side, radius);
-            ctx.fill();
+            const radius = c.r * (cr / 100);
+            ctx.roundRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2, radius);
           }
         }
+
+        // One fill per channel keeps overlapping antialiased edges from
+        // multiplying against themselves.
+        ctx.fill();
       }
 
       ctx.globalCompositeOperation = 'source-over';

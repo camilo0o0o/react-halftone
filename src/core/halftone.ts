@@ -1,5 +1,13 @@
-import type { HalftoneConfig, Circle, GridConfig, DisplayDimensions, ShapeType, CMYKChannel, HalftoneCMYKProps } from './types';
-import { rgbToCmyk } from './colorConversion';
+import type {
+  HalftoneConfig,
+  Circle,
+  GridConfig,
+  DisplayDimensions,
+  ShapeType,
+  CMYKChannel,
+  HalftoneCMYKConfig,
+} from './types';
+import { rgbToCmyk } from './color';
 
 const MIN_RADIUS = 0.5;
 const MIN_STEP = 0.1;
@@ -134,36 +142,6 @@ export function generateCircles(
   return circles;
 }
 
-export function circleToPath(cx: number, cy: number, r: number): string {
-  return `M${cx},${cy} m-${r},0 a${r},${r} 0 1,0 ${r * 2},0 a${r},${r} 0 1,0 -${r * 2},0 `;
-}
-
-export function squareToPath(cx: number, cy: number, s: number, cornerRadiusPct: number): string {
-  if (cornerRadiusPct <= 0) {
-    const x = cx - s;
-    const y = cy - s;
-    const side = s * 2;
-    return `M${x},${y} h${side} v${side} h-${side} z `;
-  }
-
-  const cr = s * (cornerRadiusPct / 100);
-  const straight = 2 * (s - cr);
-  const x0 = cx - s + cr;
-  const y0 = cy - s;
-  return `M${x0},${y0} h${straight} a${cr},${cr} 0 0,1 ${cr},${cr} v${straight} a${cr},${cr} 0 0,1 -${cr},${cr} h-${straight} a${cr},${cr} 0 0,1 -${cr},-${cr} v-${straight} a${cr},${cr} 0 0,1 ${cr},-${cr} z `;
-}
-
-export function generatePathData(
-  circles: Circle[],
-  shape: ShapeType = 'circle',
-  cornerRadius: number = 0
-): string {
-  if (shape === 'square') {
-    return circles.map((c) => squareToPath(c.x, c.y, c.r, cornerRadius)).join('');
-  }
-  return circles.map((c) => circleToPath(c.x, c.y, c.r)).join('');
-}
-
 export function calculateDisplayDimensions(
   naturalWidth: number,
   naturalHeight: number,
@@ -202,43 +180,6 @@ export function calculateDisplayDimensions(
   };
 }
 
-export function generateHalftone(
-  image: HTMLImageElement,
-  config: HalftoneConfig
-): {
-  circles: Circle[];
-  pathData: string;
-  viewBox: string;
-} {
-  const { naturalWidth, naturalHeight } = image;
-
-  const grid = calculateGrid(naturalWidth, naturalHeight, config.step, config.density, config.stepBasis);
-
-  if (grid.numCols < 1 || grid.numRows < 1) {
-    return {
-      circles: [],
-      pathData: '',
-      viewBox: `0 0 ${naturalWidth} ${naturalHeight}`,
-    };
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = naturalWidth;
-  canvas.height = naturalHeight;
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(image, 0, 0);
-
-  const pixels = ctx.getImageData(0, 0, naturalWidth, naturalHeight).data;
-  const circles = generateCircles(pixels, naturalWidth, naturalHeight, grid, config.invert);
-  const pathData = generatePathData(circles, config.shape, config.cornerRadius);
-
-  return {
-    circles,
-    pathData,
-    viewBox: `0 0 ${naturalWidth} ${naturalHeight}`,
-  };
-}
-
 // --- CMYK Halftone ---
 
 export const CMYK_DEFAULT_ANGLES = { c: 15, m: 75, y: 0, k: 45 } as const;
@@ -249,43 +190,38 @@ export interface ValidatedCMYKChannelConfig {
   angle: number;
   step: number;
   density: number;
-  shape: ShapeType;
-  cornerRadius: number;
 }
 
 export interface ValidatedCMYKConfig {
   stepBasis: 'min' | 'width';
+  shape: ShapeType;
+  cornerRadius: number;
   channels: Record<CMYKChannel, ValidatedCMYKChannelConfig>;
 }
 
-export function validateCMYKConfig(props: Partial<HalftoneCMYKProps>): ValidatedCMYKConfig {
-  const globalStep = clamp(props.step ?? 10, MIN_STEP, MAX_STEP);
-  const globalDensity = clamp(props.density ?? 80, MIN_DENSITY, MAX_DENSITY);
-  const globalShape = VALID_SHAPES.includes(props.shape as ShapeType)
-    ? (props.shape as ShapeType)
+export function validateCMYKConfig(config: Partial<HalftoneCMYKConfig>): ValidatedCMYKConfig {
+  const globalStep = clamp(config.step ?? 10, MIN_STEP, MAX_STEP);
+  const globalDensity = clamp(config.density ?? 80, MIN_DENSITY, MAX_DENSITY);
+  const shape = VALID_SHAPES.includes(config.shape as ShapeType)
+    ? (config.shape as ShapeType)
     : 'circle';
-  const globalCornerRadius = clamp(props.cornerRadius ?? 0, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS);
-  const stepBasis = props.stepBasis === 'width' ? 'width' : 'min' as const;
+  const cornerRadius = clamp(config.cornerRadius ?? 0, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS);
+  const stepBasis = config.stepBasis === 'width' ? 'width' : 'min' as const;
 
   const channels = {} as Record<CMYKChannel, ValidatedCMYKChannelConfig>;
 
   for (const ch of CMYK_CHANNELS) {
-    const override = props.channels?.[ch];
-    const shape = override?.shape && VALID_SHAPES.includes(override.shape)
-      ? override.shape
-      : globalShape;
+    const override = config.channels?.[ch];
     const rawAngle = override?.angle ?? CMYK_DEFAULT_ANGLES[ch];
     const angle = Number.isFinite(rawAngle) ? rawAngle : CMYK_DEFAULT_ANGLES[ch];
     channels[ch] = {
       angle: ((angle % 360) + 360) % 360,
       step: clamp(override?.step ?? globalStep, MIN_STEP, MAX_STEP),
       density: clamp(override?.density ?? globalDensity, MIN_DENSITY, MAX_DENSITY),
-      shape,
-      cornerRadius: clamp(override?.cornerRadius ?? globalCornerRadius, MIN_CORNER_RADIUS, MAX_CORNER_RADIUS),
     };
   }
 
-  return { stepBasis, channels };
+  return { stepBasis, shape, cornerRadius, channels };
 }
 
 export function generateRotatedGridPoints(

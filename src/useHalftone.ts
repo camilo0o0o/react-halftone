@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { HalftoneConfig, HalftoneStatus, UseHalftoneResult, Circle } from './types';
-import { validateConfig, calculateGrid, generateCircles, generatePathData, computeDownsampleScale, scaleCircles } from './core';
+import { validateConfig, calculateGrid, computeDownsampleScale, computeHalftone } from './core';
 
 interface State {
   status: HalftoneStatus;
@@ -14,6 +14,9 @@ interface State {
 }
 
 const IDLE_STATE: State = { status: 'idle', error: null, result: null };
+
+const CORS_HINT =
+  'Failed to process image (this often means a cross-origin image without CORS headers)';
 
 export function useHalftone(
   src: string,
@@ -46,17 +49,11 @@ export function useHalftone(
           const validated = validateConfig(config);
           const { naturalWidth, naturalHeight } = img;
 
-          const fullGrid = calculateGrid(naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis);
-
-          if (fullGrid.numCols < 1 || fullGrid.numRows < 1) {
-            setState({
-              status: 'ready',
-              error: null,
-              result: { circles: [], pathData: '', naturalWidth, naturalHeight },
-            });
-            return;
-          }
-
+          // Decide the work resolution here (adapter concern); the pure core
+          // then computes against whatever pixel buffer we hand it.
+          const fullGrid = calculateGrid(
+            naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis
+          );
           const scale = computeDownsampleScale(fullGrid.stepPx);
           const workWidth = Math.round(naturalWidth / scale);
           const workHeight = Math.round(naturalHeight / scale);
@@ -66,14 +63,9 @@ export function useHalftone(
           canvas.height = workHeight;
           const ctx = canvas.getContext('2d')!;
           ctx.drawImage(img, 0, 0, workWidth, workHeight);
-
           const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
-          const grid = scale === 1
-            ? fullGrid
-            : calculateGrid(workWidth, workHeight, validated.step, validated.density, validated.stepBasis);
-          const rawCircles = generateCircles(pixels, workWidth, workHeight, grid, validated.invert, scale);
-          const circles = scaleCircles(rawCircles, scale);
-          const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
+
+          const { circles, pathData } = computeHalftone(pixels, workWidth, workHeight, scale, config);
 
           setState({
             status: 'ready',
@@ -85,9 +77,7 @@ export function useHalftone(
           const message = err instanceof Error ? err.message : String(err);
           setState({
             status: 'error',
-            error: new Error(
-              `Failed to process image (this often means a cross-origin image without CORS headers): ${message}`
-            ),
+            error: new Error(`${CORS_HINT}: ${message}`),
             result: null,
           });
         }

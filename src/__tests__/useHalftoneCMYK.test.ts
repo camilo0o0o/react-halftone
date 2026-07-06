@@ -26,25 +26,22 @@ class MockImage {
 }
 
 vi.mock('../core', async () => {
-  const actual = await vi.importActual('../core');
+  const actual = await vi.importActual<typeof import('../core')>('../core');
+  const twoCircles = [
+    { x: 10, y: 10, r: 3 },
+    { x: 20, y: 20, r: 2 },
+  ];
   return {
     ...actual,
-    calculateGrid: vi.fn().mockReturnValue({
-      stepPx: 10,
-      maxRadius: 4,
-      numCols: 10,
-      numRows: 10,
-      startX: 5,
-      startY: 5,
-    }),
-    generateRotatedGridPoints: vi.fn().mockReturnValue([
-      { x: 10, y: 10 },
-      { x: 20, y: 20 },
-    ]),
-    generateChannelCircles: vi.fn().mockReturnValue([
-      { x: 10, y: 10, r: 3 },
-      { x: 20, y: 20, r: 2 },
-    ]),
+    // Mock the orchestrator: the hook's job is load-image → compute → set-state.
+    computeHalftoneCMYK: vi.fn(() => ({
+      channels: {
+        c: { circles: twoCircles, angle: 15, color: '#00FFFF' },
+        m: { circles: twoCircles, angle: 75, color: '#FF00FF' },
+        y: { circles: twoCircles, angle: 0, color: '#FFFF00' },
+        k: { circles: twoCircles, angle: 45, color: '#000000' },
+      },
+    })),
   };
 });
 

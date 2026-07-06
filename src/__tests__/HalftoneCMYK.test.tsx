@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React, { createRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
-import { HalftoneCMYK } from '../HalftoneCMYK';
+import { HalftoneCMYKCanvas } from '../HalftoneCMYKCanvas';
 import type { UseHalftoneCMYKResult, HalftoneCMYKHandle, HalftoneStatus } from '../types';
 import { useHalftoneCMYK } from '../useHalftoneCMYK';
 
@@ -98,46 +98,46 @@ describe('HalftoneCMYK component', () => {
   describe('rendering states', () => {
     it('returns null while loading', () => {
       mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
 
     it('renders canvas after successful load', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       const canvas = container.querySelector('canvas');
       expect(canvas).not.toBeNull();
     });
 
     it('returns null on error', () => {
       mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: new Error('fail'), channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
-      render(<HalftoneCMYK src="bad.png" />);
+      render(<HalftoneCMYKCanvas src="bad.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
   });
 
   describe('canvas attributes', () => {
     it('has correct width and height attributes', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       const canvas = container.querySelector('canvas')!;
       expect(canvas.getAttribute('width')).toBe('100');
       expect(canvas.getAttribute('height')).toBe('100');
     });
 
     it('has correct CSS display dimensions', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       const canvas = container.querySelector('canvas')!;
       expect(canvas.style.width).toBe('100px');
       expect(canvas.style.height).toBe('100px');
     });
 
     it('forwards className to canvas', () => {
-      render(<HalftoneCMYK src="test.png" className="my-class" />);
+      render(<HalftoneCMYKCanvas src="test.png" className="my-class" />);
       const canvas = container.querySelector('canvas')!;
       expect(canvas.classList.contains('my-class')).toBe(true);
     });
 
     it('forwards style to canvas', () => {
-      render(<HalftoneCMYK src="test.png" style={{ opacity: 0.5 }} />);
+      render(<HalftoneCMYKCanvas src="test.png" style={{ opacity: 0.5 }} />);
       const canvas = container.querySelector('canvas')!;
       expect(canvas.style.opacity).toBe('0.5');
     });
@@ -145,19 +145,19 @@ describe('HalftoneCMYK component', () => {
 
   describe('canvas drawing', () => {
     it('fills white background first', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       expect(fillStyleValues[0]).toBe('#FFFFFF');
       expect(mockCtx.fillRect).toHaveBeenCalledWith(0, 0, 100, 100);
     });
 
     it('sets multiply composite operation', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       const setter = Object.getOwnPropertyDescriptor(mockCtx, 'globalCompositeOperation')!.set!;
       expect(setter).toHaveBeenCalledWith('multiply');
     });
 
     it('draws all 4 channel colors', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       // White bg + 4 channels = 5 fillStyle sets
       expect(fillStyleValues).toContain('#00FFFF');
       expect(fillStyleValues).toContain('#FF00FF');
@@ -166,7 +166,7 @@ describe('HalftoneCMYK component', () => {
     });
 
     it('draws channels in order C, M, Y, K', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       // fillStyleValues[0] = '#FFFFFF' (background)
       // Then C, M, Y, K
       expect(fillStyleValues[1]).toBe('#00FFFF');
@@ -176,13 +176,13 @@ describe('HalftoneCMYK component', () => {
     });
 
     it('draws circles with arc for each channel', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       // 4 channels × 1 circle each = 4 arc calls
       expect(mockCtx.arc).toHaveBeenCalledTimes(4);
     });
 
     it('resets composite operation after drawing', () => {
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       const setter = Object.getOwnPropertyDescriptor(mockCtx, 'globalCompositeOperation')!.set!;
       expect(setter).toHaveBeenCalledWith('source-over');
     });
@@ -197,7 +197,7 @@ describe('HalftoneCMYK component', () => {
           k: { circles: defaultChannelCircles, angle: 45, color: '#000000' },
         },
       };
-      render(<HalftoneCMYK src="test.png" />);
+      render(<HalftoneCMYKCanvas src="test.png" />);
       // White bg + M + K = only M and K colors set
       expect(fillStyleValues).toEqual(['#FFFFFF', '#FF00FF', '#000000']);
     });
@@ -205,7 +205,7 @@ describe('HalftoneCMYK component', () => {
 
   describe('props forwarding', () => {
     it('forwards config props to useHalftoneCMYK', () => {
-      render(<HalftoneCMYK src="test.png" step={5} density={90} />);
+      render(<HalftoneCMYKCanvas src="test.png" step={5} density={90} />);
       expect(useHalftoneCMYK).toHaveBeenCalledWith('test.png', expect.objectContaining({
         step: 5,
         density: 90,
@@ -219,7 +219,7 @@ describe('HalftoneCMYK component', () => {
       vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(mockToDataURL);
 
       const ref = createRef<HalftoneCMYKHandle>();
-      render(<HalftoneCMYK ref={ref} src="test.png" />);
+      render(<HalftoneCMYKCanvas ref={ref} src="test.png" />);
 
       const result = ref.current!.toDataURL('image/png', 1.0);
       expect(mockToDataURL).toHaveBeenCalledWith('image/png', 1.0);
@@ -231,7 +231,7 @@ describe('HalftoneCMYK component', () => {
       vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(mockToBlob);
 
       const ref = createRef<HalftoneCMYKHandle>();
-      render(<HalftoneCMYK ref={ref} src="test.png" />);
+      render(<HalftoneCMYKCanvas ref={ref} src="test.png" />);
 
       const callback = vi.fn();
       ref.current!.toBlob(callback, 'image/jpeg', 0.95);

@@ -25,26 +25,19 @@ class MockImage {
   }
 }
 
-// Mock core functions that depend on canvas
+// Mock the orchestrator: the hook's job is load-image → compute → set-state.
 vi.mock('../core', async () => {
-  const actual = await vi.importActual('../core');
+  const actual = await vi.importActual<typeof import('../core')>('../core');
   return {
     ...actual,
-    calculateGrid: vi.fn().mockReturnValue({
-      stepPx: 10,
-      maxRadius: 4,
-      numCols: 10,
-      numRows: 10,
-      startX: 5,
-      startY: 5,
-    }),
-    generateCircles: vi.fn().mockReturnValue([
-      { x: 10, y: 10, r: 5 },
-      { x: 20, y: 20, r: 3 },
-    ]),
-    generatePathData: vi.fn().mockReturnValue(
-      'M10,10 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 M20,20 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 '
-    ),
+    computeHalftone: vi.fn(() => ({
+      circles: [
+        { x: 10, y: 10, r: 5 },
+        { x: 20, y: 20, r: 3 },
+      ],
+      pathData:
+        'M10,10 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 M20,20 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 ',
+    })),
   };
 });
 
@@ -184,8 +177,8 @@ describe('useHalftone', () => {
 
     it('changing shape config triggers re-processing', () => {
       const { result, rerender } = renderHook(
-        ({ shape }) => useHalftone('test.png', { shape }),
-        { initialProps: { shape: 'circle' as const } }
+        ({ shape }: { shape: 'circle' | 'square' }) => useHalftone('test.png', { shape }),
+        { initialProps: { shape: 'circle' as 'circle' | 'square' } }
       );
       triggerImageLoad(0);
       expect(result.current.status).toBe('ready');
@@ -232,8 +225,8 @@ describe('useHalftone', () => {
 
     it('changing stepBasis config triggers re-processing', () => {
       const { result, rerender } = renderHook(
-        ({ stepBasis }) => useHalftone('test.png', { stepBasis }),
-        { initialProps: { stepBasis: 'min' as const } }
+        ({ stepBasis }: { stepBasis: 'min' | 'width' }) => useHalftone('test.png', { stepBasis }),
+        { initialProps: { stepBasis: 'min' as 'min' | 'width' } }
       );
       triggerImageLoad(0);
       expect(result.current.status).toBe('ready');

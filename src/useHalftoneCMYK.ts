@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import type { HalftoneCMYKProps, HalftoneStatus, UseHalftoneCMYKResult, CMYKChannel, CMYKChannelResult } from './types';
+import type {
+  HalftoneCMYKConfig,
+  HalftoneStatus,
+  UseHalftoneCMYKResult,
+  CMYKChannel,
+  CMYKChannelResult,
+} from './types';
 import {
   validateCMYKConfig,
   calculateGrid,
-  generateRotatedGridPoints,
-  generateChannelCircles,
   computeDownsampleScale,
-  scaleCircles,
-  CMYK_CHANNEL_COLORS,
+  computeHalftoneCMYK,
 } from './core';
 
 const CHANNEL_KEYS: CMYKChannel[] = ['c', 'm', 'y', 'k'];
@@ -24,9 +27,12 @@ interface State {
 
 const IDLE_STATE: State = { status: 'idle', error: null, result: null };
 
+const CORS_HINT =
+  'Failed to process image (this often means a cross-origin image without CORS headers)';
+
 export function useHalftoneCMYK(
   src: string,
-  config: Partial<HalftoneCMYKProps> = {}
+  config: Partial<HalftoneCMYKConfig> = {}
 ): UseHalftoneCMYKResult {
   const [state, setState] = useState<State>(IDLE_STATE);
 
@@ -55,14 +61,12 @@ export function useHalftoneCMYK(
           const validated = validateCMYKConfig(config);
           const { naturalWidth, naturalHeight } = img;
 
-          // Find the smallest stepPx across all channels to determine downsample scale
+          // The smallest stepPx across channels drives the work resolution.
           let minStepPx = Infinity;
           for (const ch of CHANNEL_KEYS) {
             const chConfig = validated.channels[ch];
             const { stepPx } = calculateGrid(
-              naturalWidth, naturalHeight,
-              chConfig.step, chConfig.density,
-              validated.stepBasis
+              naturalWidth, naturalHeight, chConfig.step, chConfig.density, validated.stepBasis
             );
             if (stepPx < minStepPx) minStepPx = stepPx;
           }
@@ -78,32 +82,7 @@ export function useHalftoneCMYK(
           ctx.drawImage(img, 0, 0, workWidth, workHeight);
           const pixels = ctx.getImageData(0, 0, workWidth, workHeight).data;
 
-          const channels = {} as Record<CMYKChannel, CMYKChannelResult>;
-
-          for (const ch of CHANNEL_KEYS) {
-            const chConfig = validated.channels[ch];
-            const { stepPx, maxRadius } = calculateGrid(
-              workWidth, workHeight,
-              chConfig.step, chConfig.density,
-              validated.stepBasis
-            );
-
-            const gridPoints = generateRotatedGridPoints(
-              workWidth, workHeight,
-              stepPx, chConfig.angle
-            );
-
-            const rawCircles = generateChannelCircles(
-              pixels, workWidth, workHeight,
-              gridPoints, maxRadius, ch, scale
-            );
-
-            channels[ch] = {
-              circles: scaleCircles(rawCircles, scale),
-              angle: chConfig.angle,
-              color: CMYK_CHANNEL_COLORS[ch],
-            };
-          }
+          const { channels } = computeHalftoneCMYK(pixels, workWidth, workHeight, scale, config);
 
           setState({
             status: 'ready',
@@ -115,9 +94,7 @@ export function useHalftoneCMYK(
           const message = err instanceof Error ? err.message : String(err);
           setState({
             status: 'error',
-            error: new Error(
-              `Failed to process image (this often means a cross-origin image without CORS headers): ${message}`
-            ),
+            error: new Error(`${CORS_HINT}: ${message}`),
             result: null,
           });
         }

@@ -1,13 +1,29 @@
+// React components + hooks (browser entry)
 export { Halftone } from './Halftone';
 export { HalftoneCanvas } from './HalftoneCanvas';
-export { HalftoneCMYK } from './HalftoneCMYK';
+export { HalftoneCMYKCanvas } from './HalftoneCMYKCanvas';
 export { useHalftone } from './useHalftone';
 export { useHalftoneCMYK } from './useHalftoneCMYK';
-export { rgbToCmyk } from './colorConversion';
-export type { CMYK } from './colorConversion';
-export type { HalftoneProps, HalftoneCanvasProps, HalftoneConfig, Circle, UseHalftoneResult, HalftoneStatus, ShapeType } from './types';
+
+// Pure core (also available dependency-free via 'react-halftone/core')
+export {
+  rgbToCmyk,
+  computeHalftone,
+  computeHalftoneCMYK,
+  renderHalftoneSVG,
+  renderHalftoneCMYKSVG,
+} from './core';
+export type { CMYK } from './core';
+
+// React prop / result types
 export type {
-  CMYKChannel, CMYKChannelConfig, CMYKChannelsConfig,
-  HalftoneCMYKProps, HalftoneCMYKHandle,
-  UseHalftoneCMYKResult, CMYKChannelResult,
+  HalftoneProps, HalftoneCanvasProps, UseHalftoneResult,
+  HalftoneCMYKProps, HalftoneCMYKHandle, UseHalftoneCMYKResult,
+} from './types';
+
+// Shared config / data types
+export type {
+  HalftoneConfig, HalftoneCMYKConfig, Circle, HalftoneStatus, ShapeType,
+  CMYKChannel, CMYKChannelConfig, CMYKChannelsConfig, CMYKChannelResult,
+  HalftoneResult, HalftoneCMYKResult,
 } from './types';

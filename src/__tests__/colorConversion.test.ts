@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rgbToCmyk } from '../colorConversion';
+import { rgbToCmyk } from '../core/color';
 
 describe('rgbToCmyk', () => {
   it('converts pure white to all zeros', () => {
