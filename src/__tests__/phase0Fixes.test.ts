@@ -84,14 +84,14 @@ describe('downsample threshold is applied in natural space', () => {
   const gridPoints = generateRotatedGridPoints(W, H, 10, 0);
 
   it('drops sub-MIN_RADIUS dots at scale 1', () => {
-    // work radius = 0.4 < MIN_RADIUS (0.5)
-    const circles = generateChannelCircles(pixels, W, H, gridPoints, 0.4, 'k', 1);
+    // work radius = 0.08 < MIN_RADIUS (0.1)
+    const circles = generateChannelCircles(pixels, W, H, gridPoints, 0.08, 'k', 1);
     expect(circles.length).toBe(0);
   });
 
   it('keeps dots whose natural-space radius exceeds MIN_RADIUS', () => {
-    // work radius 0.4, scale 2 -> natural radius 0.8 > MIN_RADIUS
-    const circles = generateChannelCircles(pixels, W, H, gridPoints, 0.4, 'k', 2);
+    // work radius 0.08, scale 2 -> natural radius 0.16 > MIN_RADIUS (0.1)
+    const circles = generateChannelCircles(pixels, W, H, gridPoints, 0.08, 'k', 2);
     expect(circles.length).toBeGreaterThan(0);
   });
 });

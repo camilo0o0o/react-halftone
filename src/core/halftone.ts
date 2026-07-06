@@ -9,7 +9,11 @@ import type {
 } from './types';
 import { rgbToCmyk } from './color';
 
-const MIN_RADIUS = 0.5;
+// Dots below this final (natural-space) radius are culled. Kept small so faint
+// channels/tones render as light antialiased specks rather than being dropped;
+// it only removes truly imperceptible sub-~12%-ink dots (a perf/noise floor, not
+// a 1px-diameter aesthetic floor). radius 0 is still skipped (no empty dots).
+const MIN_RADIUS = 0.1;
 const MIN_STEP = 0.1;
 const MAX_STEP = 50;
 const MIN_DENSITY = 0;

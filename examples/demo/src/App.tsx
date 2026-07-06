@@ -29,6 +29,13 @@ export function App() {
   const [angleY, setAngleY] = useState(0);
   const [angleK, setAngleK] = useState(45);
 
+  // Step is shared by the slider and the exact-value number input; clamp to the
+  // range the core accepts (min matches the core's MIN_STEP of 0.1).
+  function setStepClamped(value: number) {
+    if (Number.isNaN(value)) return;
+    setStep(Math.min(10, Math.max(0.1, value)));
+  }
+
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
@@ -76,14 +83,25 @@ export function App() {
           <label>
             Step <span>{step}</span>
           </label>
-          <input
-            type="range"
-            min={0.1}
-            max={20}
-            step={0.1}
-            value={step}
-            onChange={(e) => setStep(Number(e.target.value))}
-          />
+          <div className="step-row">
+            <input
+              type="range"
+              min={0.1}
+              max={10}
+              step={0.1}
+              value={step}
+              onChange={(e) => setStepClamped(Number(e.target.value))}
+            />
+            <input
+              type="number"
+              className="step-number"
+              min={0.1}
+              max={10}
+              step={0.01}
+              value={step}
+              onChange={(e) => setStepClamped(Number(e.target.value))}
+            />
+          </div>
         </div>
         <div className="field">
           <label>

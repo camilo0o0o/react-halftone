@@ -105,7 +105,7 @@ describe('generateChannelCircles', () => {
     const pixels = makePixels(W, H, '#6496C8');
     const circles = generateChannelCircles(pixels, W, H, gridPoints, maxRadius, 'c');
     for (const c of circles) {
-      expect(c.r).toBeGreaterThan(0.5);
+      expect(c.r).toBeGreaterThan(0.1);
     }
   });
 
@@ -117,10 +117,21 @@ describe('generateChannelCircles', () => {
 
   it('off-white pixels (240,240,240) still produce dots', () => {
     const pixels = makePixels(W, H, '#f0f0f0');
-    // RGB(240,240,240) → K ≈ 0.059, radius = 4 * 0.059 ≈ 0.24 → below MIN_RADIUS
-    // So no dots expected at maxRadius=4, but with larger maxRadius they would appear
+    // RGB(240,240,240) → K ≈ 0.059, radius = 4 * 0.059 ≈ 0.24
     const largeMaxRadius = 20;
     const kCircles = generateChannelCircles(pixels, W, H, gridPoints, largeMaxRadius, 'k');
     expect(kCircles.length).toBeGreaterThan(0);
+  });
+
+  it('faint low-ink dots now render (0.1 floor) where the old 0.5 floor dropped them', () => {
+    // RGB(240,240,240) → K ≈ 0.059; at maxRadius 4 → radius ≈ 0.24.
+    // Below the old 0.5 floor (would have been dropped), above the new 0.1 floor.
+    const pixels = makePixels(W, H, '#f0f0f0');
+    const kCircles = generateChannelCircles(pixels, W, H, gridPoints, 4, 'k');
+    expect(kCircles.length).toBeGreaterThan(0);
+    for (const c of kCircles) {
+      expect(c.r).toBeGreaterThan(0.1);
+      expect(c.r).toBeLessThan(0.5);
+    }
   });
 });
