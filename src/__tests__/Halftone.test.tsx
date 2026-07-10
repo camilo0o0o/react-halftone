@@ -3,11 +3,11 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react';
 import { Halftone } from '../Halftone';
-import type { UseHalftoneResult } from '../types';
+import type { UseHalftoneResult, HalftoneStatus } from '../types';
 import { useHalftone } from '../useHalftone';
 
 const defaultHookResult: UseHalftoneResult = {
-  loading: false,
+  status: 'ready' as HalftoneStatus,
   error: null,
   circles: [{ x: 10, y: 10, r: 5 }],
   pathData: 'M10,10 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 ',
@@ -49,7 +49,7 @@ function render(el: React.ReactElement) {
 describe('Halftone component', () => {
   describe('rendering states', () => {
     it('returns null while loading', () => {
-      mockHookResult = { ...defaultHookResult, loading: true, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'loading' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<Halftone src="test.png" />);
       expect(container.querySelector('svg')).toBeNull();
     });
@@ -61,13 +61,13 @@ describe('Halftone component', () => {
     });
 
     it('returns null on error', () => {
-      mockHookResult = { ...defaultHookResult, error: new Error('fail'), circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: new Error('fail'), circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<Halftone src="bad.png" />);
       expect(container.querySelector('svg')).toBeNull();
     });
 
     it('returns null when src is empty', () => {
-      mockHookResult = { ...defaultHookResult, loading: false, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+      mockHookResult = { ...defaultHookResult, status: 'idle' as HalftoneStatus, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
       render(<Halftone src="" />);
       expect(container.querySelector('svg')).toBeNull();
     });

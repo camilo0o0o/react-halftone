@@ -7,6 +7,8 @@ import {
   squareToPath,
   generatePathData,
   calculateDisplayDimensions,
+  computeDownsampleScale,
+  scaleCircles,
 } from '../core';
 
 describe('validateConfig', () => {
@@ -312,5 +314,48 @@ describe('calculateDisplayDimensions', () => {
     const dims = calculateDisplayDimensions(natW, natH, 800, 100);
     expect(dims.width).toBe(200); // 800 * 0.25
     expect(dims.height).toBe(100); // 400 * 0.25
+  });
+});
+
+describe('computeDownsampleScale', () => {
+  // Target is ~3.5 source pixels per grid cell: scale = max(1, stepPx / 3.5).
+  it('returns 1 when cells are at/below the target size', () => {
+    expect(computeDownsampleScale(3.5)).toBe(1);
+    expect(computeDownsampleScale(1.5)).toBe(1);
+    expect(computeDownsampleScale(1)).toBe(1);
+    expect(computeDownsampleScale(0.1)).toBe(1);
+  });
+
+  it('downsamples proportionally as cell size grows', () => {
+    expect(computeDownsampleScale(7)).toBeCloseTo(2);
+    expect(computeDownsampleScale(35)).toBeCloseTo(10);
+    expect(computeDownsampleScale(350)).toBeCloseTo(100);
+  });
+});
+
+describe('scaleCircles', () => {
+  it('returns same array when scale is 1', () => {
+    const circles = [{ x: 10, y: 20, r: 5 }];
+    expect(scaleCircles(circles, 1)).toBe(circles);
+  });
+
+  it('multiplies all coords and radii by scale', () => {
+    const circles = [
+      { x: 10, y: 20, r: 5 },
+      { x: 30, y: 40, r: 2 },
+    ];
+    const scaled = scaleCircles(circles, 2);
+    expect(scaled).toEqual([
+      { x: 20, y: 40, r: 10 },
+      { x: 60, y: 80, r: 4 },
+    ]);
+  });
+
+  it('handles fractional scale', () => {
+    const circles = [{ x: 10, y: 10, r: 4 }];
+    const scaled = scaleCircles(circles, 1.5);
+    expect(scaled[0].x).toBeCloseTo(15);
+    expect(scaled[0].y).toBeCloseTo(15);
+    expect(scaled[0].r).toBeCloseTo(6);
   });
 });

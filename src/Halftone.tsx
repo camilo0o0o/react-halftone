@@ -1,6 +1,7 @@
 import type { HalftoneProps } from './types';
 import { calculateDisplayDimensions } from './core';
 import { useHalftone } from './useHalftone';
+import { resolveFallback, useOnError } from './fallback';
 
 export function Halftone({
   src,
@@ -11,16 +12,21 @@ export function Halftone({
   shape,
   cornerRadius,
   stepBasis,
+  crossOrigin,
   width: propWidth,
   height: propHeight,
   className,
   style,
+  fallback,
+  onError,
 }: HalftoneProps): JSX.Element | null {
-  const { loading, error, pathData, naturalWidth, naturalHeight } =
-    useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis });
+  const { status, error, pathData, naturalWidth, naturalHeight } =
+    useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis, crossOrigin });
 
-  if (loading || error || !pathData || naturalWidth === null || naturalHeight === null) {
-    return null;
+  useOnError(status, error, onError);
+
+  if (status !== 'ready' || !pathData || naturalWidth === null || naturalHeight === null) {
+    return (resolveFallback(fallback, status, error) as JSX.Element | null) ?? null;
   }
 
   const dims = calculateDisplayDimensions(naturalWidth, naturalHeight, propWidth, propHeight);

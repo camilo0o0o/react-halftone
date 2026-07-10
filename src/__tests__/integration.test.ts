@@ -1,11 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { createCanvas, Image as CanvasImage } from 'canvas';
+import { createCanvas } from 'canvas';
 import {
   samplePixelFromBuffer,
   generateCircles,
   calculateGrid,
-  generateHalftone,
+  computeHalftone,
 } from '../core';
+
+function pixelsFor(width: number, height: number, paint: (ctx: any) => void) {
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d') as unknown as CanvasRenderingContext2D;
+  paint(ctx);
+  return (ctx as any).getImageData(0, 0, width, height).data as Uint8ClampedArray;
+}
 
 function makeCanvasCtx(width: number, height: number) {
   const canvas = createCanvas(width, height);
@@ -145,20 +152,14 @@ describe('generateCircles', () => {
   });
 });
 
-describe('generateHalftone (full pipeline)', () => {
+describe('computeHalftone (full pipeline)', () => {
   it('produces non-empty result for a valid test image', () => {
-    const { canvas, ctx } = makeCanvasCtx(100, 100);
-    (ctx as any).fillStyle = '#333333';
-    (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = pixelsFor(100, 100, (ctx) => {
+      ctx.fillStyle = '#333333';
+      ctx.fillRect(0, 0, 100, 100);
+    });
 
-    // Create a fake HTMLImageElement-like object with canvas data
-    const dataUrl = (canvas as any).toDataURL();
-
-    const img = new CanvasImage();
-    img.src = dataUrl;
-
-    // Cast as HTMLImageElement for the function signature
-    const result = generateHalftone(img as unknown as HTMLImageElement, {
+    const result = computeHalftone(pixels, 100, 100, 1, {
       step: 10,
       density: 80,
       color: '#000000',
@@ -166,66 +167,48 @@ describe('generateHalftone (full pipeline)', () => {
 
     expect(result.circles.length).toBeGreaterThan(0);
     expect(result.pathData.length).toBeGreaterThan(0);
-    expect(result.viewBox).toBe('0 0 100 100');
   });
 
-  it('returns empty result for invalid grid', () => {
-    // A 2x2 image with step=50 and density=100:
-    // stepPx = 2*0.5=1, maxRadius=0.5, available=2-1=1
-    // numCols = floor(1/1)+1 = 2, numRows = 2 — still valid
-    // Use a 1x1 image instead: stepPx=0.5, maxRadius=0.25, available=1-0.5=0.5
-    // numCols = floor(0.5/0.5)+1 = 2 — still not 0
-    // To truly get 0 cells, we need available < 0 → maxRadius > imageSize/2
-    // That requires density=100 and stepPx > imageSize, but step is capped at 50%
-    // So instead test with a white image where circles are empty (radius < MIN_RADIUS)
-    const { canvas, ctx } = makeCanvasCtx(10, 10);
-    (ctx as any).fillStyle = '#ffffff';
-    (ctx as any).fillRect(0, 0, 10, 10);
+  it('returns empty result for a white image (all dots below MIN_RADIUS)', () => {
+    const pixels = pixelsFor(10, 10, (ctx) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 10, 10);
+    });
 
-    const img = new CanvasImage();
-    img.src = (canvas as any).toDataURL();
-
-    const result = generateHalftone(img as unknown as HTMLImageElement, {
+    const result = computeHalftone(pixels, 10, 10, 1, {
       step: 50,
       density: 100,
       color: '#000000',
     });
 
-    // White image → all circles below MIN_RADIUS → empty
     expect(result.circles).toEqual([]);
     expect(result.pathData).toBe('');
-    expect(result.viewBox).toBe('0 0 10 10');
   });
 
   it('produces circles on white image with invert=true', () => {
-    const { canvas, ctx } = makeCanvasCtx(100, 100);
-    (ctx as any).fillStyle = '#ffffff';
-    (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = pixelsFor(100, 100, (ctx) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 100, 100);
+    });
 
-    const img = new CanvasImage();
-    img.src = (canvas as any).toDataURL();
-
-    const result = generateHalftone(img as unknown as HTMLImageElement, {
+    const result = computeHalftone(pixels, 100, 100, 1, {
       step: 10,
       density: 80,
       color: '#ffffff',
       invert: true,
     });
 
-    // With invert, white image should produce circles
     expect(result.circles.length).toBeGreaterThan(0);
     expect(result.pathData.length).toBeGreaterThan(0);
   });
 
   it('produces square paths with shape=square', () => {
-    const { canvas, ctx } = makeCanvasCtx(100, 100);
-    (ctx as any).fillStyle = '#333333';
-    (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = pixelsFor(100, 100, (ctx) => {
+      ctx.fillStyle = '#333333';
+      ctx.fillRect(0, 0, 100, 100);
+    });
 
-    const img = new CanvasImage();
-    img.src = (canvas as any).toDataURL();
-
-    const result = generateHalftone(img as unknown as HTMLImageElement, {
+    const result = computeHalftone(pixels, 100, 100, 1, {
       step: 10,
       density: 80,
       color: '#000000',
@@ -243,14 +226,12 @@ describe('generateHalftone (full pipeline)', () => {
   });
 
   it('produces rounded square paths with shape=square and cornerRadius=50', () => {
-    const { canvas, ctx } = makeCanvasCtx(100, 100);
-    (ctx as any).fillStyle = '#333333';
-    (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = pixelsFor(100, 100, (ctx) => {
+      ctx.fillStyle = '#333333';
+      ctx.fillRect(0, 0, 100, 100);
+    });
 
-    const img = new CanvasImage();
-    img.src = (canvas as any).toDataURL();
-
-    const result = generateHalftone(img as unknown as HTMLImageElement, {
+    const result = computeHalftone(pixels, 100, 100, 1, {
       step: 10,
       density: 80,
       color: '#000000',
@@ -267,21 +248,18 @@ describe('generateHalftone (full pipeline)', () => {
   });
 
   it('produces no circles on black image with invert=true', () => {
-    const { canvas, ctx } = makeCanvasCtx(100, 100);
-    (ctx as any).fillStyle = '#000000';
-    (ctx as any).fillRect(0, 0, 100, 100);
+    const pixels = pixelsFor(100, 100, (ctx) => {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, 100, 100);
+    });
 
-    const img = new CanvasImage();
-    img.src = (canvas as any).toDataURL();
-
-    const result = generateHalftone(img as unknown as HTMLImageElement, {
+    const result = computeHalftone(pixels, 100, 100, 1, {
       step: 10,
       density: 80,
       color: '#ffffff',
       invert: true,
     });
 
-    // With invert, black image should produce no circles
     expect(result.circles).toEqual([]);
     expect(result.pathData).toBe('');
   });

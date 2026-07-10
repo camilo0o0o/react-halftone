@@ -1,15 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
-import type { HalftoneConfig, HalftoneStatus, UseHalftoneResult, Circle } from './types';
-import { validateConfig, calculateGrid, computeDownsampleScale, computeHalftone } from './core';
+import type {
+  HalftoneCMYKConfig,
+  HalftoneStatus,
+  UseHalftoneCMYKResult,
+  CMYKChannel,
+  CMYKChannelResult,
+} from './types';
+import {
+  validateCMYKConfig,
+  calculateGrid,
+  computeDownsampleScale,
+  computeHalftoneCMYK,
+} from './core';
 import { loadImageElement, extractPixels } from './getPixels';
 import type { LoadedImage, ExtractedPixels } from './getPixels';
+
+const CHANNEL_KEYS: CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
 interface State {
   status: HalftoneStatus;
   error: Error | null;
   result: {
-    circles: Circle[];
-    pathData: string;
+    channels: Record<CMYKChannel, CMYKChannelResult>;
     naturalWidth: number;
     naturalHeight: number;
   } | null;
@@ -20,18 +32,17 @@ const IDLE_STATE: State = { status: 'idle', error: null, result: null };
 const CORS_HINT =
   'Failed to process image (this often means a cross-origin image without CORS headers)';
 
-export function useHalftone(
+export function useHalftoneCMYK(
   src: string,
-  config: Partial<HalftoneConfig> & { crossOrigin?: string | null } = {}
-): UseHalftoneResult {
+  config: Partial<HalftoneCMYKConfig> & { crossOrigin?: string | null } = {}
+): UseHalftoneCMYKResult {
   const crossOrigin = config.crossOrigin ?? 'anonymous';
   const [state, setState] = useState<State>(IDLE_STATE);
   const loadedRef = useRef<LoadedImage | null>(null);
   const pixelCacheRef = useRef<ExtractedPixels | null>(null);
   const [loadedVersion, setLoadedVersion] = useState(0);
 
-  // Effect A — load/decode the image. Keyed on `src` only, so dragging config
-  // sliders never re-fetches or re-decodes the bitmap.
+  // Effect A — load/decode once per src.
   useEffect(() => {
     if (!src) {
       loadedRef.current = null;
@@ -67,9 +78,9 @@ export function useHalftone(
     };
   }, [src, crossOrigin]);
 
-  // Effect B — compute from the cached image. Reuses the extracted pixel buffer
-  // whenever the downsample scale is unchanged, and keeps the previous result
-  // on screen while recomputing so the output never unmounts mid-drag.
+  // Effect B — compute from the cached image. Because the pixel buffer is keyed
+  // on the downsample scale (driven by step/density, not angle), dragging a
+  // channel angle reuses the cached buffer and skips getImageData entirely.
   useEffect(() => {
     const loaded = loadedRef.current;
     if (!loaded) return;
@@ -81,13 +92,19 @@ export function useHalftone(
       if (cancelled) return;
 
       try {
-        const validated = validateConfig(config);
+        const validated = validateCMYKConfig(config);
         const { naturalWidth, naturalHeight } = loaded;
 
-        const { stepPx } = calculateGrid(
-          naturalWidth, naturalHeight, validated.step, validated.density, validated.stepBasis
-        );
-        const scale = computeDownsampleScale(stepPx);
+        // The finest channel (smallest stepPx) drives the work resolution.
+        let minStepPx = Infinity;
+        for (const ch of CHANNEL_KEYS) {
+          const chConfig = validated.channels[ch];
+          const { stepPx } = calculateGrid(
+            naturalWidth, naturalHeight, chConfig.step, chConfig.density, validated.stepBasis
+          );
+          if (stepPx < minStepPx) minStepPx = stepPx;
+        }
+        const scale = computeDownsampleScale(minStepPx);
 
         let cache = pixelCacheRef.current;
         if (!cache || cache.scale !== scale) {
@@ -95,14 +112,14 @@ export function useHalftone(
           pixelCacheRef.current = cache;
         }
 
-        const { circles, pathData } = computeHalftone(
+        const { channels } = computeHalftoneCMYK(
           cache.pixels, cache.workWidth, cache.workHeight, scale, config
         );
 
         setState({
           status: 'ready',
           error: null,
-          result: { circles, pathData, naturalWidth, naturalHeight },
+          result: { channels, naturalWidth, naturalHeight },
         });
       } catch (err) {
         if (cancelled) return;
@@ -116,15 +133,18 @@ export function useHalftone(
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedVersion, config.step, config.density, config.color, config.invert, config.shape, config.cornerRadius, config.stepBasis]);
+  }, [loadedVersion, config.step, config.density, config.shape, config.cornerRadius, config.stepBasis, JSON.stringify(config.channels)]);
+
+  const totalCircleCount = state.result
+    ? CHANNEL_KEYS.reduce((sum, ch) => sum + state.result!.channels[ch].circles.length, 0)
+    : 0;
 
   return {
     status: state.status,
     error: state.error,
-    circles: state.result?.circles ?? null,
-    pathData: state.result?.pathData ?? null,
+    channels: state.result?.channels ?? null,
     naturalWidth: state.result?.naturalWidth ?? null,
     naturalHeight: state.result?.naturalHeight ?? null,
-    circleCount: state.result?.circles?.length ?? 0,
+    totalCircleCount,
   };
 }

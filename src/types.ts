@@ -1,38 +1,40 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import type {
+  ShapeType,
+  Circle,
+  HalftoneStatus,
+  CMYKChannel,
+  CMYKChannelResult,
+} from './core/types';
 
 /**
- * Shape type for halftone dots
+ * Content shown while a component is not yet in the 'ready' state. Either a
+ * static node or a render function receiving the current status and error.
  */
-export type ShapeType = 'circle' | 'square';
+export type HalftoneFallback =
+  | ReactNode
+  | ((status: HalftoneStatus, error: Error | null) => ReactNode);
+
+// Re-export the environment-agnostic core types so existing consumers that
+// import them from './types' keep working.
+export type {
+  ShapeType,
+  HalftoneConfig,
+  Circle,
+  GridConfig,
+  DisplayDimensions,
+  HalftoneStatus,
+  CMYKChannel,
+  CMYKChannelConfig,
+  CMYKChannelsConfig,
+  HalftoneCMYKConfig,
+  CMYKChannelResult,
+  HalftoneResult,
+  HalftoneCMYKResult,
+} from './core/types';
 
 /**
- * Configuration for halftone generation
- */
-export interface HalftoneConfig {
-  /** Grid spacing as percentage of smaller dimension (0.1-50) */
-  step: number;
-
-  /** Maximum circle size as percentage (0-100) */
-  density: number;
-
-  /** Fill color for circles (hex format) */
-  color: string;
-
-  /** Invert brightness mapping (for dark backgrounds) */
-  invert: boolean;
-
-  /** Shape of halftone dots */
-  shape: ShapeType;
-
-  /** Corner radius percentage for square shapes (0-100) */
-  cornerRadius: number;
-
-  /** Dimension used to calculate step size: 'min' (smaller dimension) or 'width' (image width) */
-  stepBasis: 'min' | 'width';
-}
-
-/**
- * Props for the Halftone React component
+ * Props for the Halftone / HalftoneCanvas React components
  */
 export interface HalftoneProps {
   /** Image source URL */
@@ -70,61 +72,22 @@ export interface HalftoneProps {
 
   /** Inline styles */
   style?: CSSProperties;
-}
 
-/**
- * Circle data for SVG generation
- */
-export interface Circle {
-  /** Center X coordinate */
-  x: number;
+  /** crossOrigin attribute for the loaded image (default 'anonymous'; null to omit) */
+  crossOrigin?: string | null;
 
-  /** Center Y coordinate */
-  y: number;
+  /** Rendered while not yet ready (loading/processing/error). Defaults to null. */
+  fallback?: HalftoneFallback;
 
-  /** Radius */
-  r: number;
-}
-
-/**
- * Grid calculation result
- */
-export interface GridConfig {
-  /** Step size in pixels */
-  stepPx: number;
-
-  /** Maximum circle radius */
-  maxRadius: number;
-
-  /** Number of columns */
-  numCols: number;
-
-  /** Number of rows */
-  numRows: number;
-
-  /** Starting X position */
-  startX: number;
-
-  /** Starting Y position */
-  startY: number;
-}
-
-/**
- * Display dimensions
- */
-export interface DisplayDimensions {
-  /** Display width */
-  width: number;
-
-  /** Display height */
-  height: number;
+  /** Called when image loading or processing fails. */
+  onError?: (error: Error) => void;
 }
 
 /**
  * Return type for the useHalftone hook
  */
 export interface UseHalftoneResult {
-  loading: boolean;
+  status: HalftoneStatus;
   error: Error | null;
   circles: Circle[] | null;
   pathData: string | null;
@@ -134,3 +97,59 @@ export interface UseHalftoneResult {
 }
 
 export type HalftoneCanvasProps = HalftoneProps;
+
+/**
+ * Props for the HalftoneCMYKCanvas component
+ */
+export interface HalftoneCMYKProps {
+  /** Image source URL */
+  src: string;
+  /** Grid spacing percentage (0.1-50) — global default */
+  step?: number;
+  /** Maximum dot size percentage (0-100) — global default */
+  density?: number;
+  /** Dot shape — global default (applies to every channel) */
+  shape?: ShapeType;
+  /** Corner radius percentage for square shapes — global default */
+  cornerRadius?: number;
+  /** Dimension used to calculate step size */
+  stepBasis?: 'min' | 'width';
+  /** Per-channel config overrides (angle/step/density only) */
+  channels?: import('./core/types').CMYKChannelsConfig;
+  /** Display width in pixels */
+  width?: number;
+  /** Display height in pixels */
+  height?: number;
+  /** CSS class name */
+  className?: string;
+  /** Inline styles */
+  style?: CSSProperties;
+  /** crossOrigin attribute for the loaded image (default 'anonymous'; null to omit) */
+  crossOrigin?: string | null;
+  /** Rendered while not yet ready (loading/processing/error). Defaults to null. */
+  fallback?: HalftoneFallback;
+  /** Called when image loading or processing fails. */
+  onError?: (error: Error) => void;
+}
+
+/**
+ * Imperative handle for HalftoneCMYKCanvas export
+ */
+export interface HalftoneCMYKHandle {
+  toDataURL: (type?: string, quality?: number) => string;
+  toBlob: (callback: BlobCallback, type?: string, quality?: number) => void;
+  /** The underlying canvas element, or null before it mounts. */
+  getCanvas: () => HTMLCanvasElement | null;
+}
+
+/**
+ * Return type for the useHalftoneCMYK hook
+ */
+export interface UseHalftoneCMYKResult {
+  status: HalftoneStatus;
+  error: Error | null;
+  channels: Record<CMYKChannel, CMYKChannelResult> | null;
+  naturalWidth: number | null;
+  naturalHeight: number | null;
+  totalCircleCount: number;
+}

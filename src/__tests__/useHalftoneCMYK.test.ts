@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useHalftone } from '../useHalftone';
+import { useHalftoneCMYK } from '../useHalftoneCMYK';
 
 let mockImageInstances: any[] = [];
 
@@ -25,25 +25,29 @@ class MockImage {
   }
 }
 
-// Mock the orchestrator: the hook's job is load-image → compute → set-state.
 vi.mock('../core', async () => {
   const actual = await vi.importActual<typeof import('../core')>('../core');
+  const twoCircles = [
+    { x: 10, y: 10, r: 3 },
+    { x: 20, y: 20, r: 2 },
+  ];
   return {
     ...actual,
-    computeHalftone: vi.fn(() => ({
-      circles: [
-        { x: 10, y: 10, r: 5 },
-        { x: 20, y: 20, r: 3 },
-      ],
-      pathData:
-        'M10,10 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 M20,20 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 ',
+    // Mock the orchestrator: the hook's job is load-image → compute → set-state.
+    computeHalftoneCMYK: vi.fn(() => ({
+      channels: {
+        c: { circles: twoCircles, angle: 15, color: '#00FFFF' },
+        m: { circles: twoCircles, angle: 75, color: '#FF00FF' },
+        y: { circles: twoCircles, angle: 0, color: '#FFFF00' },
+        k: { circles: twoCircles, angle: 45, color: '#000000' },
+      },
     })),
   };
 });
 
 const mockCtx = {
   drawImage: vi.fn(),
-  getImageData: vi.fn().mockReturnValue({ data: [0, 0, 0, 255] }),
+  getImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray([0, 0, 0, 255]) }),
 };
 
 const originalCreateElement = document.createElement.bind(document);
@@ -89,66 +93,104 @@ function triggerImageError(index = 0) {
   }
 }
 
-describe('useHalftone', () => {
+describe('useHalftoneCMYK', () => {
   describe('initial/loading state', () => {
     it('returns loading status before image loads', () => {
-      const { result } = renderHook(() => useHalftone('test.png'));
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
 
       expect(result.current).toEqual({
         status: 'loading',
         error: null,
-        circles: null,
-        pathData: null,
+        channels: null,
         naturalWidth: null,
         naturalHeight: null,
-        circleCount: 0,
+        totalCircleCount: 0,
       });
     });
   });
 
   describe('successful load', () => {
-    it('returns ready status with circles and pathData after load', () => {
-      const { result } = renderHook(() => useHalftone('test.png'));
+    it('returns all 4 channels after load', () => {
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
       triggerImageLoad();
 
       expect(result.current.status).toBe('ready');
       expect(result.current.error).toBeNull();
-      expect(result.current.circles).toHaveLength(2);
-      expect(result.current.pathData).toContain('M10,10');
+      expect(result.current.channels).not.toBeNull();
+      expect(result.current.channels!.c).toBeDefined();
+      expect(result.current.channels!.m).toBeDefined();
+      expect(result.current.channels!.y).toBeDefined();
+      expect(result.current.channels!.k).toBeDefined();
+    });
+
+    it('each channel has circles, angle, and color', () => {
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
+      triggerImageLoad();
+
+      const ch = result.current.channels!;
+      for (const key of ['c', 'm', 'y', 'k'] as const) {
+        expect(ch[key].circles).toBeInstanceOf(Array);
+        expect(typeof ch[key].angle).toBe('number');
+        expect(typeof ch[key].color).toBe('string');
+      }
+    });
+
+    it('uses default angles', () => {
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
+      triggerImageLoad();
+
+      const ch = result.current.channels!;
+      expect(ch.c.angle).toBe(15);
+      expect(ch.m.angle).toBe(75);
+      expect(ch.y.angle).toBe(0);
+      expect(ch.k.angle).toBe(45);
+    });
+
+    it('uses correct channel colors', () => {
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
+      triggerImageLoad();
+
+      const ch = result.current.channels!;
+      expect(ch.c.color).toBe('#00FFFF');
+      expect(ch.m.color).toBe('#FF00FF');
+      expect(ch.y.color).toBe('#FFFF00');
+      expect(ch.k.color).toBe('#000000');
+    });
+
+    it('returns dimensions', () => {
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
+      triggerImageLoad();
+
       expect(result.current.naturalWidth).toBe(100);
       expect(result.current.naturalHeight).toBe(100);
-      expect(result.current.circleCount).toBe(2);
+    });
+
+    it('returns total circle count', () => {
+      const { result } = renderHook(() => useHalftoneCMYK('test.png'));
+      triggerImageLoad();
+
+      // 4 channels x 2 circles each = 8
+      expect(result.current.totalCircleCount).toBe(8);
     });
   });
 
   describe('error handling', () => {
     it('sets error status on image load failure', () => {
-      const { result } = renderHook(() => useHalftone('bad.png'));
+      const { result } = renderHook(() => useHalftoneCMYK('bad.png'));
       triggerImageError();
 
       expect(result.current.status).toBe('error');
       expect(result.current.error).toBeInstanceOf(Error);
       expect(result.current.error?.message).toBe('Failed to load image: bad.png');
-      expect(result.current.circles).toBeNull();
-      expect(result.current.pathData).toBeNull();
-      expect(result.current.circleCount).toBe(0);
-    });
-  });
-
-  describe('config defaults', () => {
-    it('works with empty config', () => {
-      const { result } = renderHook(() => useHalftone('test.png', {}));
-      triggerImageLoad();
-
-      expect(result.current.status).toBe('ready');
-      expect(result.current.circles).not.toBeNull();
+      expect(result.current.channels).toBeNull();
+      expect(result.current.totalCircleCount).toBe(0);
     });
   });
 
   describe('dependency changes', () => {
     it('changing src triggers a new image load', () => {
       const { result, rerender } = renderHook(
-        ({ src }) => useHalftone(src),
+        ({ src }) => useHalftoneCMYK(src),
         { initialProps: { src: 'first.png' } }
       );
       triggerImageLoad(0);
@@ -162,11 +204,10 @@ describe('useHalftone', () => {
       expect(result.current.status).toBe('ready');
     });
 
-    // Config changes recompute from the cached image WITHOUT reloading it —
-    // this is the realtime perf win (no re-fetch/re-decode per slider tick).
+    // Config changes recompute from the cached image WITHOUT reloading it.
     it('changing step recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
-        ({ step }) => useHalftone('test.png', { step }),
+        ({ step }) => useHalftoneCMYK('test.png', { step }),
         { initialProps: { step: 10 } }
       );
       triggerImageLoad(0);
@@ -177,72 +218,41 @@ describe('useHalftone', () => {
       expect(mockImageInstances).toHaveLength(1);
     });
 
-    it('changing shape recomputes without reloading the image', () => {
+    it('changing a channel angle recomputes without reloading the image', () => {
       const { result, rerender } = renderHook(
-        ({ shape }: { shape: 'circle' | 'square' }) => useHalftone('test.png', { shape }),
-        { initialProps: { shape: 'circle' as 'circle' | 'square' } }
+        ({ angle }) => useHalftoneCMYK('test.png', { channels: { c: { angle } } }),
+        { initialProps: { angle: 15 } }
       );
       triggerImageLoad(0);
       expect(result.current.status).toBe('ready');
 
-      rerender({ shape: 'square' as const });
-      expect(result.current.status).toBe('ready');
-      expect(mockImageInstances).toHaveLength(1);
-    });
-
-    it('changing invert recomputes without reloading the image', () => {
-      const { result, rerender } = renderHook(
-        ({ invert }) => useHalftone('test.png', { invert }),
-        { initialProps: { invert: false } }
-      );
-      triggerImageLoad(0);
-      expect(result.current.status).toBe('ready');
-
-      rerender({ invert: true });
-      expect(result.current.status).toBe('ready');
-      expect(mockImageInstances).toHaveLength(1);
-    });
-
-    it('changing stepBasis recomputes without reloading the image', () => {
-      const { result, rerender } = renderHook(
-        ({ stepBasis }: { stepBasis: 'min' | 'width' }) => useHalftone('test.png', { stepBasis }),
-        { initialProps: { stepBasis: 'min' as 'min' | 'width' } }
-      );
-      triggerImageLoad(0);
-      expect(result.current.status).toBe('ready');
-
-      rerender({ stepBasis: 'width' as const });
+      rerender({ angle: 30 });
       expect(result.current.status).toBe('ready');
       expect(mockImageInstances).toHaveLength(1);
     });
   });
 
-  describe('cleanup / stale closure', () => {
-    it('ignores stale load when src changes before completion', () => {
+  describe('cleanup', () => {
+    it('ignores stale load when src changes', () => {
       const { result, rerender } = renderHook(
-        ({ src }) => useHalftone(src),
+        ({ src }) => useHalftoneCMYK(src),
         { initialProps: { src: 'first.png' } }
       );
 
-      // Change src before first image loads
       rerender({ src: 'second.png' });
-
-      // Trigger load on first (stale) image — should be ignored
       triggerImageLoad(0);
       expect(result.current.status).toBe('loading');
-      expect(result.current.circles).toBeNull();
+      expect(result.current.channels).toBeNull();
 
-      // Trigger load on second image
       triggerImageLoad(1);
       expect(result.current.status).toBe('ready');
-      expect(result.current.circles).not.toBeNull();
+      expect(result.current.channels).not.toBeNull();
     });
 
-    it('no state updates after unmount', () => {
-      const { result, unmount } = renderHook(() => useHalftone('test.png'));
+    it('clears handlers on unmount', () => {
+      const { unmount } = renderHook(() => useHalftoneCMYK('test.png'));
       unmount();
 
-      // Should not throw — handlers are cleared
       const img = mockImageInstances[0];
       expect(img.onload).toBeNull();
       expect(img.onerror).toBeNull();
@@ -251,16 +261,15 @@ describe('useHalftone', () => {
 
   describe('empty src', () => {
     it('returns idle status with empty src', () => {
-      const { result } = renderHook(() => useHalftone(''));
+      const { result } = renderHook(() => useHalftoneCMYK(''));
 
       expect(result.current).toEqual({
         status: 'idle',
         error: null,
-        circles: null,
-        pathData: null,
+        channels: null,
         naturalWidth: null,
         naturalHeight: null,
-        circleCount: 0,
+        totalCircleCount: 0,
       });
       expect(mockImageInstances).toHaveLength(0);
     });
