@@ -1,0 +1,43 @@
+/* Design tokens + base reset for the demo.
+   The style reference hardcodes these hexes throughout; centralising them as
+   custom properties is the one deliberate deviation from it at token level. */
+
+:root {
+  --page: #d9d9d9;
+  --surface: #f7f7f7;
+  --ink: #333333;
+  --accent: #c17401;
+
+  --font: 'Spline Sans Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --border-width: 2px;
+  --border: var(--border-width) solid var(--ink);
+  --radius: 0;
+
+  --gap-lg: 24px;
+  --gap-md: 16px;
+  --gap-sm: 8px;
+}
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* Form controls inherit neither the page font nor its colour on any browser. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
