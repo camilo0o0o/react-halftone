@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useHalftoneCMYK } from '../useHalftoneCMYK';
+import { computeHalftoneCMYK } from '../core';
 
 let mockImageInstances: any[] = [];
 
@@ -184,6 +185,51 @@ describe('useHalftoneCMYK', () => {
       expect(result.current.error?.message).toBe('Failed to load image: bad.png');
       expect(result.current.channels).toBeNull();
       expect(result.current.totalCircleCount).toBe(0);
+    });
+  });
+
+  // computeHalftoneCMYK returns circle data only — shape and cornerRadius are
+  // applied by the canvas at draw time, so they must not recompute all four
+  // channels.
+  describe('recompute triggers', () => {
+    function computeCalls() {
+      return vi.mocked(computeHalftoneCMYK).mock.calls.length;
+    }
+
+    it('does not recompute when only shape changes', () => {
+      const { rerender } = renderHook(
+        ({ shape }: { shape: 'circle' | 'square' }) => useHalftoneCMYK('test.png', { shape }),
+        { initialProps: { shape: 'circle' as 'circle' | 'square' } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ shape: 'square' as const });
+      expect(computeCalls()).toBe(before);
+    });
+
+    it('does not recompute when only cornerRadius changes', () => {
+      const { rerender } = renderHook(
+        ({ cornerRadius }) => useHalftoneCMYK('test.png', { shape: 'square', cornerRadius }),
+        { initialProps: { cornerRadius: 0 } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ cornerRadius: 50 });
+      expect(computeCalls()).toBe(before);
+    });
+
+    it('recomputes when a channel angle changes', () => {
+      const { rerender } = renderHook(
+        ({ angle }) => useHalftoneCMYK('test.png', { channels: { c: { angle } } }),
+        { initialProps: { angle: 15 } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ angle: 30 });
+      expect(computeCalls()).toBeGreaterThan(before);
     });
   });
 

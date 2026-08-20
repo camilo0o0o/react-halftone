@@ -31,10 +31,12 @@ export function useHalftone(
 
       return { circles, pathData, naturalWidth, naturalHeight };
     },
+    // `color` is deliberately absent: computeHalftone never reads it (the
+    // renderers apply it at draw time), so including it would recompute every
+    // dot on a color change.
     [
       config.step,
       config.density,
-      config.color,
       config.invert,
       config.shape,
       config.cornerRadius,

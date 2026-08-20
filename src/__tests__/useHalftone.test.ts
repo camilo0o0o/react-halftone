@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useHalftone } from '../useHalftone';
+import { computeHalftone } from '../core';
 
 let mockImageInstances: any[] = [];
 
@@ -142,6 +143,51 @@ describe('useHalftone', () => {
 
       expect(result.current.status).toBe('ready');
       expect(result.current.circles).not.toBeNull();
+    });
+  });
+
+  // The recompute effect must depend only on what computeHalftone actually
+  // reads. `color` is applied by the renderers at draw time, so recomputing
+  // every dot for it is pure waste.
+  describe('recompute triggers', () => {
+    function computeCalls() {
+      return vi.mocked(computeHalftone).mock.calls.length;
+    }
+
+    it('does not recompute when only color changes', () => {
+      const { rerender } = renderHook(
+        ({ color }) => useHalftone('test.png', { color }),
+        { initialProps: { color: '#000000' } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ color: '#ff0000' });
+      expect(computeCalls()).toBe(before);
+    });
+
+    it('recomputes when shape changes (pathData depends on it)', () => {
+      const { rerender } = renderHook(
+        ({ shape }: { shape: 'circle' | 'square' }) => useHalftone('test.png', { shape }),
+        { initialProps: { shape: 'circle' as 'circle' | 'square' } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ shape: 'square' as const });
+      expect(computeCalls()).toBeGreaterThan(before);
+    });
+
+    it('recomputes when step changes', () => {
+      const { rerender } = renderHook(
+        ({ step }) => useHalftone('test.png', { step }),
+        { initialProps: { step: 10 } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ step: 20 });
+      expect(computeCalls()).toBeGreaterThan(before);
     });
   });
 

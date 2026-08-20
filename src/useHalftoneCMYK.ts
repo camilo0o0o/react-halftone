@@ -47,11 +47,13 @@ export function useHalftoneCMYK(
 
       return { channels, naturalWidth, naturalHeight };
     },
+    // `shape` and `cornerRadius` are deliberately absent: computeHalftoneCMYK
+    // produces circle data only and never reads them (the canvas applies them
+    // at draw time), so including them would recompute all four channels on a
+    // shape change.
     [
       config.step,
       config.density,
-      config.shape,
-      config.cornerRadius,
       config.stepBasis,
       JSON.stringify(config.channels),
     ]
