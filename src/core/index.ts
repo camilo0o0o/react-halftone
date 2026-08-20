@@ -1,10 +1,10 @@
 /**
  * Pure, environment-agnostic halftone core.
  *
- * Nothing in this module touches React, the DOM, or Node APIs — every function
- * operates on plain numbers and a raw RGBA `Uint8ClampedArray`. Browser and
- * build-time (Node) adapters both call the same `compute*` orchestrators so the
- * output is identical across environments.
+ * Nothing in this module touches React or the DOM — every function operates on
+ * plain numbers and a raw RGBA `Uint8ClampedArray`. That keeps the halftone
+ * math directly testable and callable from anywhere the pixels come from,
+ * including a Web Worker.
  */
 export * from './types';
 export * from './color';

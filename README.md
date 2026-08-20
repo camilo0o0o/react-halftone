@@ -2,7 +2,7 @@
 
 A React component and hook that converts images into halftone effects. It samples pixel brightness from an image and renders a grid of shapes — darker areas produce larger shapes, lighter areas produce smaller ones. Supports SVG and Canvas output, CMYK color separation with per-channel angle control, circle and square dot shapes, optional rounded corners on squares, and inverted mode for light-on-dark designs.
 
-Generation runs **in the browser in realtime** (React components + hooks) or **at build time in Node** (`react-halftone/node`) for images that don't need realtime processing — both driven by the same pure, dependency-free core (`react-halftone/core`), so output is identical across environments.
+Generation runs **in the browser in realtime** (React components + hooks), driven by a pure, dependency-free core (`react-halftone/core`) that you can also call directly.
 
 ![halftone_gif](https://github.com/user-attachments/assets/f1be70b2-84e4-4773-9f63-81335fb911eb)
 
@@ -12,19 +12,12 @@ Generation runs **in the browser in realtime** (React components + hooks) or **a
 npm install github:camilo0o0o/react-halftone
 ```
 
-Requires React 18+. The build-time entry (`react-halftone/node`) additionally needs [`sharp`](https://sharp.pixelplumbing.com/), declared as an **optional** peer dependency — install it only if you use the Node API:
-
-```bash
-npm install sharp
-```
-
-The package ships three entry points:
+Requires React 18+. The package ships two entry points:
 
 | Import | Contents | Environment |
 |--------|----------|-------------|
 | `react-halftone` | Components + hooks | Browser (React) |
 | `react-halftone/core` | Pure compute + SVG renderers | Any (no React, no DOM) |
-| `react-halftone/node` | `halftone*To{SVG,PNG}` | Node (needs `sharp`) |
 
 ## Usage
 
@@ -215,45 +208,7 @@ const cmyk = rgbToCmyk(255, 100, 50);
 // { c: 0, m: 0.608, y: 0.804, k: 0 }
 ```
 
-## Build-time generation (Node)
-
-For images that don't need realtime processing, precompute the halftone during a build step and ship the static SVG or PNG. The `react-halftone/node` entry decodes with [`sharp`](https://sharp.pixelplumbing.com/) (an optional peer dependency) and runs the **same core** as the browser, so the output matches.
-
-```ts
-// scripts/generate-halftones.mjs
-import { writeFile } from 'node:fs/promises';
-import {
-  halftoneToSVG,
-  halftoneToPNG,
-  halftoneCMYKToSVG,
-  halftoneCMYKToPNG,
-} from 'react-halftone/node';
-
-// Input can be a file path, a Buffer, or a Uint8Array.
-const svg = await halftoneToSVG('photo.jpg', { step: 4, color: '#000000' });
-await writeFile('out/photo.svg', svg);
-
-const png = await halftoneToPNG('photo.jpg', { step: 4 });
-await writeFile('out/photo.png', png);
-
-// CMYK — SVG uses mix-blend-mode:multiply; PNG composites channels with sharp.
-const cmykSvg = await halftoneCMYKToSVG('photo.jpg', { step: 3 });
-await writeFile('out/photo-cmyk.svg', cmykSvg);
-
-const cmykPng = await halftoneCMYKToPNG('photo.jpg', { step: 3 });
-await writeFile('out/photo-cmyk.png', cmykPng);
-```
-
-| Function | Returns | Config |
-|----------|---------|--------|
-| `halftoneToSVG(input, config?)` | `Promise<string>` | `Partial<HalftoneConfig>` |
-| `halftoneToPNG(input, config?)` | `Promise<Buffer>` | `Partial<HalftoneConfig>` |
-| `halftoneCMYKToSVG(input, config?)` | `Promise<string>` | `Partial<HalftoneCMYKConfig>` |
-| `halftoneCMYKToPNG(input, config?)` | `Promise<Buffer>` | `Partial<HalftoneCMYKConfig>` |
-
-`input` is a file path, `Buffer`, or `Uint8Array`. All four accept the same config options as the corresponding browser components.
-
-### Pure core (`react-halftone/core`)
+## Pure core (`react-halftone/core`)
 
 If you already have raw RGBA pixels (from a worker, a different image loader, or your own canvas), the framework-agnostic core computes halftones with no React and no DOM:
 
