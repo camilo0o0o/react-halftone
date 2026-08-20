@@ -1,10 +1,26 @@
-import { useState, useRef } from 'react';
-import { Halftone, HalftoneCanvas, HalftoneCMYKCanvas, useHalftone } from 'react-halftone';
+import { useRef, useState } from 'react';
+import {
+  Halftone,
+  HalftoneCanvas,
+  HalftoneCMYKCanvas,
+  useHalftone,
+  useHalftoneCMYK,
+} from 'react-halftone';
 import type {
+  CMYKChannelsConfig,
   HalftoneCMYKHandle,
   HalftoneFallback,
+  HalftoneStatus,
   ShapeType,
 } from 'react-halftone';
+import { Button } from './components/Button';
+import { Card } from './components/Card';
+import { Checkbox } from './components/Checkbox';
+import { DetailRow } from './components/DetailRow';
+import { SegmentedControl } from './components/SegmentedControl';
+import { Slider } from './components/Slider';
+import { SwatchRow } from './components/SwatchRow';
+import { UploadButton } from './components/UploadButton';
 
 type Mode = 'mono' | 'cmyk';
 type Renderer = 'canvas' | 'svg';
@@ -12,6 +28,70 @@ type StepBasis = 'min' | 'width';
 type PreviewBg = 'light' | 'dark' | 'checker';
 
 const COLOR_PRESETS = ['#000000', '#ffffff', '#e63946', '#1d4ed8', '#f77f00'];
+
+const MODE_OPTIONS: { value: Mode; label: string }[] = [
+  { value: 'mono', label: 'Monochrome' },
+  { value: 'cmyk', label: 'CMYK' },
+];
+
+const RENDERER_OPTIONS: { value: Renderer; label: string }[] = [
+  { value: 'canvas', label: 'Canvas' },
+  { value: 'svg', label: 'SVG' },
+];
+
+const STEP_BASIS_OPTIONS: { value: StepBasis; label: string }[] = [
+  { value: 'min', label: 'Min' },
+  { value: 'width', label: 'Width' },
+];
+
+const SHAPE_OPTIONS: { value: ShapeType; label: string }[] = [
+  { value: 'circle', label: 'Circle' },
+  { value: 'square', label: 'Square' },
+];
+
+const PREVIEW_BG_OPTIONS: { value: PreviewBg; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'checker', label: 'Checker' },
+];
+
+const CHANNEL_SWATCHES = {
+  c: '#00ffff',
+  m: '#ff00ff',
+  y: '#ffff00',
+  k: '#000000',
+} as const;
+
+interface StatsViewProps {
+  status: HalftoneStatus;
+  naturalWidth: number | null;
+  naturalHeight: number | null;
+  dots: number;
+}
+
+function StatsView({ status, naturalWidth, naturalHeight, dots }: StatsViewProps) {
+  if (status === 'error') {
+    return <DetailRow label="Stats" value="unavailable" />;
+  }
+
+  // Gate on the result rather than `status === 'ready'`: the hooks retain the
+  // previous result while a config change recomputes, so the numbers hold
+  // steady instead of blanking on every slider tick — same as the preview
+  // beside them. They lag by a frame while recomputing, so mark them stale.
+  if (naturalWidth === null || naturalHeight === null) {
+    return <DetailRow label="Stats" value="computing…" />;
+  }
+
+  const stale = status === 'processing';
+
+  return (
+    <>
+      <DetailRow label="Width" value={`${naturalWidth}px`} stale={stale} />
+      <DetailRow label="Height" value={`${naturalHeight}px`} stale={stale} />
+      <DetailRow label="Dots" value={dots.toLocaleString()} stale={stale} />
+    </>
+  );
+}
 
 interface MonoStatsProps {
   src: string;
@@ -24,23 +104,45 @@ interface MonoStatsProps {
   stepBasis: StepBasis;
 }
 
+// Both stats components run the computation a second time, in parallel with
+// the one the preview component does — the rendering components don't expose
+// their counts. That's the price of the panel, and why it's behind a toggle.
 function MonoStats({ src, ...config }: MonoStatsProps) {
   const { status, circleCount, naturalWidth, naturalHeight } = useHalftone(src, config);
 
-  if (status === 'error') return <p className="stats-line">stats unavailable</p>;
+  return (
+    <StatsView
+      status={status}
+      naturalWidth={naturalWidth}
+      naturalHeight={naturalHeight}
+      dots={circleCount}
+    />
+  );
+}
 
-  // Gate on the result rather than `status === 'ready'`: the hook retains the
-  // previous result while a config change recomputes, so the numbers hold
-  // steady instead of blanking on every slider tick — same as the preview
-  // beside them. They lag by a frame while recomputing, so mark them stale.
-  if (naturalWidth === null || naturalHeight === null) {
-    return <p className="stats-line">computing…</p>;
-  }
+interface CmykStatsProps {
+  src: string;
+  step: number;
+  density: number;
+  shape: ShapeType;
+  cornerRadius: number;
+  stepBasis: StepBasis;
+  channels: CMYKChannelsConfig;
+}
+
+function CmykStats({ src, ...config }: CmykStatsProps) {
+  const { status, totalCircleCount, naturalWidth, naturalHeight } = useHalftoneCMYK(
+    src,
+    config
+  );
 
   return (
-    <p className="stats-line" data-stale={status === 'processing' || undefined}>
-      {circleCount.toLocaleString()} dots · {naturalWidth}×{naturalHeight}px source
-    </p>
+    <StatsView
+      status={status}
+      naturalWidth={naturalWidth}
+      naturalHeight={naturalHeight}
+      dots={totalCircleCount}
+    />
   );
 }
 
@@ -82,12 +184,8 @@ export function App() {
     setStep(Math.min(10, Math.max(0.1, value)));
   }
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setImageSrc(url);
-    }
+  function handleFileUpload(file: File) {
+    setImageSrc(URL.createObjectURL(file));
   }
 
   function handleExport() {
@@ -106,6 +204,20 @@ export function App() {
       <p className="status-text">Generating halftone…</p>
     ) : null;
 
+  const channels: CMYKChannelsConfig = {
+    c: { angle: angleC },
+    m: { angle: angleM },
+    y: { angle: angleY },
+    k: { angle: angleK },
+  };
+
+  const angleControls: { channel: keyof typeof CHANNEL_SWATCHES; label: string; value: number; onChange: (v: number) => void }[] = [
+    { channel: 'c', label: 'Cyan', value: angleC, onChange: setAngleC },
+    { channel: 'm', label: 'Magenta', value: angleM, onChange: setAngleM },
+    { channel: 'y', label: 'Yellow', value: angleY, onChange: setAngleY },
+    { channel: 'k', label: 'Black (K)', value: angleK, onChange: setAngleK },
+  ];
+
   const monoProps = {
     src: imageSrc,
     step,
@@ -121,288 +233,16 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="controls">
-        <h1>react-halftone</h1>
+      <div className="sidebar">
+        <header className="sidebar-header">
+          <h1 className="app-title">react-halftone</h1>
+        </header>
 
-        <div className="mode-toggle">
-          <button
-            className={mode === 'mono' ? 'active' : ''}
-            onClick={() => setMode('mono')}
-          >
-            Monochrome
-          </button>
-          <button
-            className={mode === 'cmyk' ? 'active' : ''}
-            onClick={() => setMode('cmyk')}
-          >
-            CMYK
-          </button>
-        </div>
+        <SegmentedControl value={mode} options={MODE_OPTIONS} onChange={setMode} />
 
-        <h2>Image</h2>
-        <div className="field">
-          <input type="file" accept="image/*" onChange={handleFileUpload} />
-        </div>
-
-        {mode === 'mono' && (
-          <>
-            <h2>Renderer</h2>
-            <div className="shape-toggle">
-              <button
-                className={renderer === 'canvas' ? 'active' : ''}
-                onClick={() => setRenderer('canvas')}
-              >
-                Canvas (raster)
-              </button>
-              <button
-                className={renderer === 'svg' ? 'active' : ''}
-                onClick={() => setRenderer('svg')}
-              >
-                SVG
-              </button>
-            </div>
-          </>
-        )}
-
-        <h2>Grid</h2>
-        <div className="field">
-          <label>
-            Step <span>{step}</span>
-          </label>
-          <div className="step-row">
-            <input
-              type="range"
-              min={0.1}
-              max={10}
-              step={0.1}
-              value={step}
-              onChange={(e) => setStepClamped(Number(e.target.value))}
-            />
-            <input
-              type="number"
-              className="step-number"
-              min={0.1}
-              max={10}
-              step={0.01}
-              value={step}
-              onChange={(e) => setStepClamped(Number(e.target.value))}
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label>
-            Density <span>{density}%</span>
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={density}
-            onChange={(e) => setDensity(Number(e.target.value))}
-          />
-        </div>
-        <div className="field">
-          <label>Step basis</label>
-          <div className="shape-toggle">
-            <button
-              className={stepBasis === 'min' ? 'active' : ''}
-              onClick={() => setStepBasis('min')}
-            >
-              min
-            </button>
-            <button
-              className={stepBasis === 'width' ? 'active' : ''}
-              onClick={() => setStepBasis('width')}
-            >
-              width
-            </button>
-          </div>
-        </div>
-
-        <h2>Shape</h2>
-        <div className="shape-toggle">
-          <button
-            className={shape === 'circle' ? 'active' : ''}
-            onClick={() => setShape('circle')}
-          >
-            Circle
-          </button>
-          <button
-            className={shape === 'square' ? 'active' : ''}
-            onClick={() => setShape('square')}
-          >
-            Square
-          </button>
-        </div>
-        {shape === 'square' && (
-          <div className="field">
-            <label>
-              Corner Radius <span>{cornerRadius}%</span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={cornerRadius}
-              onChange={(e) => setCornerRadius(Number(e.target.value))}
-            />
-          </div>
-        )}
-
-        {mode === 'mono' && (
-          <>
-            <h2>Color</h2>
-            <div className="field">
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-              />
-            </div>
-            <div className="swatch-row">
-              {COLOR_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  className={`swatch ${color === preset ? 'active' : ''}`}
-                  style={{ background: preset }}
-                  title={preset}
-                  onClick={() => setColor(preset)}
-                />
-              ))}
-            </div>
-            <div className="toggle-row">
-              <input
-                type="checkbox"
-                id="invert"
-                checked={invert}
-                onChange={(e) => setInvert(e.target.checked)}
-              />
-              <label htmlFor="invert">Invert (for dark backgrounds)</label>
-            </div>
-          </>
-        )}
-
-        {mode === 'cmyk' && (
-          <>
-            <h2>Channel Angles</h2>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#00FFFF' }} />
-                Cyan
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleC}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleC}
-                  onChange={(e) => setAngleC(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#FF00FF' }} />
-                Magenta
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleM}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleM}
-                  onChange={(e) => setAngleM(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#FFFF00', border: '1px solid #ccc' }} />
-                Yellow
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleY}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleY}
-                  onChange={(e) => setAngleY(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#000000' }} />
-                Black (K)
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleK}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleK}
-                  onChange={(e) => setAngleK(Number(e.target.value))}
-                />
-              </div>
-            </div>
-
-            <button className="export-btn" onClick={handleExport}>
-              Export PNG
-            </button>
-          </>
-        )}
-
-        <h2>Preview</h2>
-        <div className="shape-toggle">
-          <button
-            className={previewBg === 'light' ? 'active' : ''}
-            onClick={() => setPreviewBg('light')}
-          >
-            Light
-          </button>
-          <button
-            className={previewBg === 'dark' ? 'active' : ''}
-            onClick={() => setPreviewBg('dark')}
-          >
-            Dark
-          </button>
-          <button
-            className={previewBg === 'checker' ? 'active' : ''}
-            onClick={() => setPreviewBg('checker')}
-          >
-            Checker
-          </button>
-        </div>
-        {mode === 'mono' && (
-          <>
-            <div className="toggle-row">
-              <input
-                type="checkbox"
-                id="stats"
-                checked={showStats}
-                onChange={(e) => setShowStats(e.target.checked)}
-              />
-              <label htmlFor="stats">Show dot count</label>
-            </div>
-            {showStats && (
+        {showStats && (
+          <Card title="Details">
+            {mode === 'mono' ? (
               <MonoStats
                 src={imageSrc}
                 step={step}
@@ -413,9 +253,141 @@ export function App() {
                 cornerRadius={cornerRadius}
                 stepBasis={stepBasis}
               />
+            ) : (
+              <CmykStats
+                src={imageSrc}
+                step={step}
+                density={density}
+                shape={shape}
+                cornerRadius={cornerRadius}
+                stepBasis={stepBasis}
+                channels={channels}
+              />
             )}
-          </>
+          </Card>
         )}
+
+        <Card title="Image">
+          <UploadButton label="Upload image" onFile={handleFileUpload} />
+        </Card>
+
+        {mode === 'mono' && (
+          <Card title="Renderer">
+            <SegmentedControl
+              value={renderer}
+              options={RENDERER_OPTIONS}
+              onChange={setRenderer}
+            />
+          </Card>
+        )}
+
+        <Card title="Grid">
+          <Slider
+            label="Step"
+            value={step}
+            min={0.1}
+            max={10}
+            step={0.1}
+            onChange={setStepClamped}
+          >
+            <input
+              type="number"
+              min={0.1}
+              max={10}
+              step={0.01}
+              value={step}
+              aria-label="Step, exact value"
+              onChange={(e) => setStepClamped(Number(e.target.value))}
+            />
+          </Slider>
+          <Slider
+            label="Density"
+            value={density}
+            display={`${density}%`}
+            min={0}
+            max={100}
+            step={1}
+            onChange={setDensity}
+          />
+          <SegmentedControl
+            label="Step basis"
+            value={stepBasis}
+            options={STEP_BASIS_OPTIONS}
+            onChange={setStepBasis}
+          />
+        </Card>
+
+        <Card title="Shape">
+          <SegmentedControl value={shape} options={SHAPE_OPTIONS} onChange={setShape} />
+          {shape === 'square' && (
+            <Slider
+              label="Corner radius"
+              value={cornerRadius}
+              display={`${cornerRadius}%`}
+              min={0}
+              max={100}
+              step={1}
+              onChange={setCornerRadius}
+            />
+          )}
+        </Card>
+
+        {mode === 'mono' && (
+          <Card title="Colour">
+            <div className="color-row">
+              <input
+                type="color"
+                value={color}
+                aria-label="Dot colour"
+                onChange={(e) => setColor(e.target.value)}
+              />
+              <SwatchRow colors={COLOR_PRESETS} value={color} onChange={setColor} />
+            </div>
+            <Checkbox
+              label="Invert (for dark backgrounds)"
+              checked={invert}
+              onChange={setInvert}
+            />
+          </Card>
+        )}
+
+        {mode === 'cmyk' && (
+          <Card title="Channels">
+            {angleControls.map(({ channel, label, value, onChange }) => (
+              <div className="channel-group" key={channel}>
+                <span className="channel-label">
+                  <span
+                    className="channel-dot"
+                    style={{ background: CHANNEL_SWATCHES[channel] }}
+                  />
+                  {label}
+                </span>
+                <Slider
+                  label="Angle"
+                  value={value}
+                  display={`${value}°`}
+                  min={0}
+                  max={360}
+                  step={1}
+                  onChange={onChange}
+                />
+              </div>
+            ))}
+            <Button variant="accent" block onClick={handleExport}>
+              Export PNG
+            </Button>
+          </Card>
+        )}
+
+        <Card title="Preview">
+          <SegmentedControl
+            label="Background"
+            value={previewBg}
+            options={PREVIEW_BG_OPTIONS}
+            onChange={setPreviewBg}
+          />
+          <Checkbox label="Show dot count" checked={showStats} onChange={setShowStats} />
+        </Card>
       </div>
 
       <div className={`preview bg-${previewBg}`}>
@@ -434,12 +406,7 @@ export function App() {
             shape={shape}
             cornerRadius={cornerRadius}
             stepBasis={stepBasis}
-            channels={{
-              c: { angle: angleC },
-              m: { angle: angleM },
-              y: { angle: angleY },
-              k: { angle: angleK },
-            }}
+            channels={channels}
             width={700}
             fallback={previewFallback}
           />
