@@ -151,10 +151,14 @@ function CustomHalftone({ src }: { src: string }) {
   const { status, error, circles, naturalWidth, naturalHeight } =
     useHalftone(src, { step: 5, density: 90, color: '#000000' });
 
-  if (status === 'loading') return <p>Loading...</p>;
-  if (status === 'processing') return <p>Generating halftone...</p>;
   if (status === 'error') return <p>Error: {error!.message}</p>;
-  if (status !== 'ready' || !circles || !naturalWidth || !naturalHeight) return null;
+
+  // Gate on the result, not on `status === 'ready'`. The hook keeps the
+  // previous result while a config change recomputes, so this renders the
+  // last good output instead of unmounting on every slider tick.
+  if (circles === null || naturalWidth === null || naturalHeight === null) {
+    return <p>Loading...</p>;
+  }
 
   return (
     <svg viewBox={`0 0 ${naturalWidth} ${naturalHeight}`} width={400}>
@@ -184,10 +188,11 @@ Returns per-channel circle data for custom CMYK rendering.
 import { useHalftoneCMYK } from 'react-halftone';
 
 function CustomCMYK({ src }: { src: string }) {
-  const { status, channels, naturalWidth, naturalHeight } =
+  const { channels, naturalWidth, naturalHeight } =
     useHalftoneCMYK(src, { step: 3 });
 
-  if (status !== 'ready' || !channels || !naturalWidth || !naturalHeight) return null;
+  // Gate on the result, not on `status === 'ready'` — see the note above.
+  if (channels === null || naturalWidth === null || naturalHeight === null) return null;
 
   // Access individual channel data
   const { circles, color } = channels.c; // cyan channel
@@ -240,11 +245,13 @@ Both components accept the same props:
 | `className` | `string` | — | CSS class for the element |
 | `style` | `CSSProperties` | — | Inline styles for the element |
 | `crossOrigin` | `string \| null` | `'anonymous'` | crossOrigin attribute for the loaded image (`null` to omit) |
-| `fallback` | `ReactNode \| ((status, error) => ReactNode)` | — | Rendered while not ready (loading/processing/error). Defaults to nothing. |
-| `onError` | `(error: Error) => void` | — | Called when image loading or processing fails |
-| `ref` | `Ref<HTMLCanvasElement>` | — | (`HalftoneCanvas` only) Ref to the canvas element |
+| `fallback` | `ReactNode \| ((status, error) => ReactNode)` | — | Rendered until there is output to show — `idle`/`loading`/`error`, and the first `processing` pass. Not shown during later recomputes, where the previous output stays. Defaults to nothing. |
+| `onError` | `(error: Error) => void` | — | Called once each time the component enters the error state. Safe to pass an inline arrow, and safe to call `setState` from. |
+| `ref` | `Ref<HTMLCanvasElement>` | — | (`HalftoneCanvas` only) Ref to the canvas element. Non-null whenever output is mounted, including during a recompute. |
 
 If both `width` and `height` are provided, the image scales to fit within those bounds while preserving aspect ratio. If only one is provided, the other is calculated automatically.
+
+Props are validated rather than trusted: numeric values are clamped to the ranges above (`NaN` included), an unrecognized `shape` falls back to `'circle'`, and a malformed `color` falls back to `#000000`. `Halftone` and `HalftoneCanvas` apply identical validation, so the SVG and canvas renderers always agree for the same props.
 
 ### `HalftoneCMYKCanvas` component props
 
@@ -262,9 +269,9 @@ If both `width` and `height` are provided, the image scales to fit within those 
 | `className` | `string` | — | CSS class for the canvas |
 | `style` | `CSSProperties` | — | Inline styles for the canvas |
 | `crossOrigin` | `string \| null` | `'anonymous'` | crossOrigin attribute for the loaded image (`null` to omit) |
-| `fallback` | `ReactNode \| ((status, error) => ReactNode)` | — | Rendered while not ready (loading/processing/error) |
-| `onError` | `(error: Error) => void` | — | Called when image loading or processing fails |
-| `ref` | `Ref<HalftoneCMYKHandle>` | — | Imperative handle for export |
+| `fallback` | `ReactNode \| ((status, error) => ReactNode)` | — | Rendered until there is output to show — `idle`/`loading`/`error`, and the first `processing` pass. Not shown during later recomputes, where the previous output stays. |
+| `onError` | `(error: Error) => void` | — | Called once each time the component enters the error state. Safe to pass an inline arrow, and safe to call `setState` from. |
+| `ref` | `Ref<HalftoneCMYKHandle>` | — | Imperative handle for export. Stays usable during a recompute, so exporting mid-drag works. |
 
 **`channels` prop:**
 
@@ -322,6 +329,11 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | `circleCount` | `number` | Number of circles (0 when not yet loaded) |
 
 The `status` field tracks the full lifecycle: `idle` (no src), `loading` (fetching image), `processing` (generating halftone dots), `ready` (complete), `error` (failed). The `processing` state is useful for showing feedback during heavy generation at low step values.
+
+`status` and the result fields move independently, and the result is usually what you want to render on:
+
+- Changing `src` clears the result, so `circles`/`pathData`/`channels` are `null` while the new image loads — you never render the old image under a new `src`.
+- Changing any other config keeps the previous result while `status` is `'processing'`, so you can keep rendering it instead of unmounting on every slider tick.
 
 The hook re-runs when `src`, `step`, `density`, `color`, `invert`, `shape`, `cornerRadius`, or `stepBasis` change. Stale loads are automatically cancelled.
 
@@ -419,7 +431,7 @@ interface HalftoneCMYKHandle {
 
 1. Loads the image and draws it to an offscreen canvas
 2. Samples each grid point's pixel brightness (converted to greyscale using RGB average)
-3. Maps brightness to shape size — by default, darker pixels get bigger shapes; with `invert: true`, brighter pixels get bigger shapes
+3. Maps brightness to shape size — by default, darker pixels get bigger shapes; with `invert: true`, brighter pixels get bigger shapes. The only dots dropped are those whose computed radius is too small to see, so highlights fade out smoothly rather than banding at a brightness threshold; pure white produces no dots because its radius is zero
 4. Generates SVG path commands based on the selected shape (circle arcs, square lines, or rounded-rect lines+arcs)
 5. `Halftone` renders all shapes as a single SVG `<path>` for performance; `HalftoneCanvas` draws to a `<canvas>` bitmap for lighter DOM weight
 
@@ -438,7 +450,7 @@ The hooks are built for smooth realtime interaction:
 - **The decoded image is cached per `src`** — dragging a config slider recomputes without re-fetching or re-decoding the image.
 - **The extracted pixel buffer is cached per downsample scale** — changing a CMYK channel angle (which doesn't change the scale) reuses the buffer and skips `getImageData` entirely.
 - **Resolution-aware downsampling** targets a constant number of source pixels per grid cell, so processing cost tracks the dot count rather than the source resolution — a 24MP photo and a 1MP photo do comparable work at the same `step`. The downscale also area-averages each cell, which is the tone a halftone dot should represent.
-- The previous result stays on screen while recomputing, so the output never flickers mid-drag.
+- **The previous result stays on screen while recomputing**, so the output never flickers mid-drag and the mounted element never disappears — a forwarded `ref` stays valid throughout, which is what makes exporting mid-drag work.
 
 ## Example app
 
