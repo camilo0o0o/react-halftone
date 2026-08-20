@@ -187,6 +187,23 @@ describe('useHalftoneCMYK', () => {
     });
   });
 
+  describe('crossOrigin', () => {
+    it('defaults to anonymous', () => {
+      renderHook(() => useHalftoneCMYK('test.png'));
+      expect(mockImageInstances[0].crossOrigin).toBe('anonymous');
+    });
+
+    it('null opts out of the attribute entirely', () => {
+      renderHook(() => useHalftoneCMYK('test.png', { crossOrigin: null }));
+      expect(mockImageInstances[0].crossOrigin).toBe('');
+    });
+
+    it('passes an explicit value through', () => {
+      renderHook(() => useHalftoneCMYK('test.png', { crossOrigin: 'use-credentials' }));
+      expect(mockImageInstances[0].crossOrigin).toBe('use-credentials');
+    });
+  });
+
   describe('dependency changes', () => {
     it('changing src triggers a new image load', () => {
       const { result, rerender } = renderHook(

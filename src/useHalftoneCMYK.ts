@@ -36,7 +36,9 @@ export function useHalftoneCMYK(
   src: string,
   config: Partial<HalftoneCMYKConfig> & { crossOrigin?: string | null } = {}
 ): UseHalftoneCMYKResult {
-  const crossOrigin = config.crossOrigin ?? 'anonymous';
+  // `??` would swallow an explicit null, which is the documented way to opt
+  // out of the crossorigin attribute entirely.
+  const crossOrigin = config.crossOrigin === undefined ? 'anonymous' : config.crossOrigin;
   const [state, setState] = useState<State>(IDLE_STATE);
   const loadedRef = useRef<LoadedImage | null>(null);
   const pixelCacheRef = useRef<ExtractedPixels | null>(null);
