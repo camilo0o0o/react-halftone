@@ -127,16 +127,15 @@ export function generateCircles(
       const y = grid.startY + row * grid.stepPx;
 
       const pixel = samplePixelFromBuffer(pixels, x, y, imageWidth, imageHeight);
-      if (!invert && pixel.r > 250 && pixel.g > 250 && pixel.b > 250) continue;
-      if (invert && pixel.r < 5 && pixel.g < 5 && pixel.b < 5) continue;
-
       const greyscale = toGreyscale(pixel.r, pixel.g, pixel.b);
       const brightness = greyscale / 255;
       const factor = invert ? brightness : 1 - brightness;
       const radius = grid.maxRadius * factor;
 
-      // Filter against the final (natural-space) radius so downsampling doesn't
-      // inflate the visibility threshold and drop dots.
+      // The computed radius is the only cull. Filtering on the source value
+      // instead would band highlights at a hard threshold, and filtering in
+      // downsampled space would inflate the floor and drop dots. Pure white
+      // still yields nothing: factor 0 means radius 0.
       if (radius * scale > MIN_RADIUS) {
         circles.push({ x, y, r: radius });
       }
@@ -282,13 +281,13 @@ export function generateChannelCircles(
 
   for (const pt of gridPoints) {
     const pixel = samplePixelFromBuffer(pixels, pt.x, pt.y, imageWidth, imageHeight);
-    if (pixel.r > 250 && pixel.g > 250 && pixel.b > 250) continue;
-
     const cmyk = rgbToCmyk(pixel.r, pixel.g, pixel.b);
     const radius = maxRadius * cmyk[channel];
 
-    // Filter against the final (natural-space) radius so downsampling doesn't
-    // inflate the visibility threshold and drop dots.
+    // The computed radius is the only cull. Filtering on the source value
+    // instead would band highlights at a hard threshold, and filtering in
+    // downsampled space would inflate the floor and drop dots. Pure white
+    // still yields nothing: zero ink means radius 0.
     if (radius * scale > MIN_RADIUS) {
       circles.push({ x: pt.x, y: pt.y, r: radius });
     }
