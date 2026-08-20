@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type {
   HalftoneCMYKConfig,
   UseHalftoneCMYKResult,
@@ -8,7 +9,7 @@ import {
   validateCMYKConfig,
   calculateGrid,
   computeDownsampleScale,
-  computeHalftoneCMYK,
+  computeHalftoneCMYKChannel,
   CMYK_CHANNELS,
 } from './core';
 import { useHalftoneEngine } from './useHalftoneEngine';
@@ -19,10 +20,28 @@ interface Result {
   naturalHeight: number;
 }
 
+interface ChannelCacheEntry {
+  key: string;
+  result: CMYKChannelResult;
+}
+
+/** Everything a channel's dots depend on, beyond the pixel buffer itself. */
+function channelKey(
+  chConfig: { angle: number; step: number; density: number },
+  stepBasis: string
+): string {
+  return `${chConfig.angle}|${chConfig.step}|${chConfig.density}|${stepBasis}`;
+}
+
 export function useHalftoneCMYK(
   src: string,
   config: Partial<HalftoneCMYKConfig> & { crossOrigin?: string | null } = {}
 ): UseHalftoneCMYKResult {
+  // Per-channel memo. The four channels are independent, so moving one angle
+  // slider should cost one channel, not four.
+  const channelCacheRef = useRef<Partial<Record<CMYKChannel, ChannelCacheEntry>>>({});
+  const cachedPixelsRef = useRef<Uint8ClampedArray | null>(null);
+
   const state = useHalftoneEngine<Result>(
     src,
     config.crossOrigin,
@@ -41,9 +60,30 @@ export function useHalftoneCMYK(
       }
       const cache = getPixels(computeDownsampleScale(minStepPx));
 
-      const { channels } = computeHalftoneCMYK(
-        cache.pixels, cache.workWidth, cache.workHeight, cache.scale, config
-      );
+      // A different buffer means a new image or a new downsample scale — every
+      // cached channel is stale.
+      if (cachedPixelsRef.current !== cache.pixels) {
+        channelCacheRef.current = {};
+        cachedPixelsRef.current = cache.pixels;
+      }
+
+      const channels = {} as Record<CMYKChannel, CMYKChannelResult>;
+      for (const ch of CMYK_CHANNELS) {
+        const key = channelKey(validated.channels[ch], validated.stepBasis);
+        const cached = channelCacheRef.current[ch];
+
+        if (cached && cached.key === key) {
+          channels[ch] = cached.result;
+          continue;
+        }
+
+        const result = computeHalftoneCMYKChannel(
+          cache.pixels, cache.workWidth, cache.workHeight, cache.scale,
+          ch, validated.channels[ch], validated.stepBasis
+        );
+        channelCacheRef.current[ch] = { key, result };
+        channels[ch] = result;
+      }
 
       return { channels, naturalWidth, naturalHeight };
     },

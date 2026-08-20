@@ -30,6 +30,7 @@ import {
   CMYK_CHANNEL_COLORS,
   CMYK_CHANNELS,
 } from './halftone';
+import type { ValidatedCMYKChannelConfig } from './halftone';
 import { generatePathData } from './svg';
 
 /**
@@ -64,6 +65,46 @@ export function computeHalftone(
 }
 
 /**
+ * Compute a single CMYK channel's rotated dot grid.
+ *
+ * Channels are fully independent, so callers that only changed one channel's
+ * settings (an angle slider, say) can recompute just that one instead of all
+ * four — see `useHalftoneCMYK`.
+ *
+ * @param pixels    RGBA buffer at work resolution (`width` x `height`).
+ * @param width     Buffer width in pixels.
+ * @param height    Buffer height in pixels.
+ * @param scale     Work→natural multiplier (1 when not downsampled). Circles
+ *                  are returned in natural-space coordinates.
+ * @param channel   Which ink to separate.
+ * @param chConfig  Already-validated angle/step/density for this channel.
+ * @param stepBasis Dimension the step percentage is measured against.
+ */
+export function computeHalftoneCMYKChannel(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  scale: number,
+  channel: CMYKChannel,
+  chConfig: ValidatedCMYKChannelConfig,
+  stepBasis: 'min' | 'width'
+): CMYKChannelResult {
+  const { stepPx, maxRadius } = calculateGrid(
+    width, height, chConfig.step, chConfig.density, stepBasis
+  );
+  const gridPoints = generateRotatedGridPoints(width, height, stepPx, chConfig.angle);
+  const rawCircles = generateChannelCircles(
+    pixels, width, height, gridPoints, maxRadius, channel, scale
+  );
+
+  return {
+    circles: scaleCircles(rawCircles, scale),
+    angle: chConfig.angle,
+    color: CMYK_CHANNEL_COLORS[channel],
+  };
+}
+
+/**
  * Compute a CMYK halftone (four rotated channels) from raw RGBA pixels.
  *
  * @param pixels RGBA buffer at work resolution (`width` x `height`).
@@ -84,18 +125,9 @@ export function computeHalftoneCMYK(
   const channels = {} as Record<CMYKChannel, CMYKChannelResult>;
 
   for (const ch of CMYK_CHANNELS) {
-    const chConfig = validated.channels[ch];
-    const { stepPx, maxRadius } = calculateGrid(
-      width, height, chConfig.step, chConfig.density, validated.stepBasis
+    channels[ch] = computeHalftoneCMYKChannel(
+      pixels, width, height, scale, ch, validated.channels[ch], validated.stepBasis
     );
-    const gridPoints = generateRotatedGridPoints(width, height, stepPx, chConfig.angle);
-    const rawCircles = generateChannelCircles(pixels, width, height, gridPoints, maxRadius, ch, scale);
-
-    channels[ch] = {
-      circles: scaleCircles(rawCircles, scale),
-      angle: chConfig.angle,
-      color: CMYK_CHANNEL_COLORS[ch],
-    };
   }
 
   return { channels };

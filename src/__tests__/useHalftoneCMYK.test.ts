@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useHalftoneCMYK } from '../useHalftoneCMYK';
-import { computeHalftoneCMYK } from '../core';
+import { computeHalftoneCMYKChannel } from '../core';
 
 let mockImageInstances: any[] = [];
 
@@ -26,23 +26,38 @@ class MockImage {
   }
 }
 
+const CHANNEL_COLORS = {
+  c: '#00FFFF',
+  m: '#FF00FF',
+  y: '#FFFF00',
+  k: '#000000',
+} as const;
+
 vi.mock('../core', async () => {
   const actual = await vi.importActual<typeof import('../core')>('../core');
   const twoCircles = [
     { x: 10, y: 10, r: 3 },
     { x: 20, y: 20, r: 2 },
   ];
+  const colors = { c: '#00FFFF', m: '#FF00FF', y: '#FFFF00', k: '#000000' };
   return {
     ...actual,
-    // Mock the orchestrator: the hook's job is load-image → compute → set-state.
-    computeHalftoneCMYK: vi.fn(() => ({
-      channels: {
-        c: { circles: twoCircles, angle: 15, color: '#00FFFF' },
-        m: { circles: twoCircles, angle: 75, color: '#FF00FF' },
-        y: { circles: twoCircles, angle: 0, color: '#FFFF00' },
-        k: { circles: twoCircles, angle: 45, color: '#000000' },
-      },
-    })),
+    // Mock at the per-channel level — the hook computes and memoises one
+    // channel at a time, so this is what it actually calls.
+    computeHalftoneCMYKChannel: vi.fn(
+      (
+        _pixels: unknown,
+        _w: number,
+        _h: number,
+        _scale: number,
+        channel: 'c' | 'm' | 'y' | 'k',
+        chConfig: { angle: number }
+      ) => ({
+        circles: twoCircles,
+        angle: chConfig.angle,
+        color: colors[channel],
+      })
+    ),
   };
 });
 
@@ -55,6 +70,9 @@ const originalCreateElement = document.createElement.bind(document);
 
 beforeEach(() => {
   mockImageInstances = [];
+  // vi.restoreAllMocks() does not reset vi.fn()s created in a module factory,
+  // so call counts would leak between tests.
+  vi.mocked(computeHalftoneCMYKChannel).mockClear();
   vi.stubGlobal('Image', MockImage);
   vi.spyOn(document, 'createElement').mockImplementation((tag: string, options?: any) => {
     if (tag === 'canvas') {
@@ -192,8 +210,11 @@ describe('useHalftoneCMYK', () => {
   // applied by the canvas at draw time, so they must not recompute all four
   // channels.
   describe('recompute triggers', () => {
+    function channelsComputed() {
+      return vi.mocked(computeHalftoneCMYKChannel).mock.calls.map((c) => c[4]);
+    }
     function computeCalls() {
-      return vi.mocked(computeHalftoneCMYK).mock.calls.length;
+      return vi.mocked(computeHalftoneCMYKChannel).mock.calls.length;
     }
 
     it('does not recompute when only shape changes', () => {
@@ -220,16 +241,30 @@ describe('useHalftoneCMYK', () => {
       expect(computeCalls()).toBe(before);
     });
 
-    it('recomputes when a channel angle changes', () => {
+    // The point of the per-channel memo: one angle slider costs one channel.
+    it('recomputes only the channel whose angle changed', () => {
       const { rerender } = renderHook(
         ({ angle }) => useHalftoneCMYK('test.png', { channels: { c: { angle } } }),
         { initialProps: { angle: 15 } }
       );
       triggerImageLoad(0);
+      expect(channelsComputed()).toEqual(['c', 'm', 'y', 'k']);
 
-      const before = computeCalls();
+      vi.mocked(computeHalftoneCMYKChannel).mockClear();
       rerender({ angle: 30 });
-      expect(computeCalls()).toBeGreaterThan(before);
+      expect(channelsComputed()).toEqual(['c']);
+    });
+
+    it('recomputes every channel when a global step changes', () => {
+      const { rerender } = renderHook(
+        ({ step }) => useHalftoneCMYK('test.png', { step }),
+        { initialProps: { step: 10 } }
+      );
+      triggerImageLoad(0);
+
+      vi.mocked(computeHalftoneCMYKChannel).mockClear();
+      rerender({ step: 20 });
+      expect(channelsComputed()).toEqual(['c', 'm', 'y', 'k']);
     });
   });
 
