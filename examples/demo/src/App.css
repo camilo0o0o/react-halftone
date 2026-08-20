@@ -263,3 +263,9 @@ body {
   color: #888;
   margin-bottom: 14px;
 }
+
+/* Numbers from the previous result, still on screen while the next one
+   computes — dimmed so a lagging count doesn't read as the current one. */
+.stats-line[data-stale] {
+  opacity: 0.45;
+}

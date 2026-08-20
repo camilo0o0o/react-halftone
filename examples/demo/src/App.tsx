@@ -26,10 +26,19 @@ interface MonoStatsProps {
 
 function MonoStats({ src, ...config }: MonoStatsProps) {
   const { status, circleCount, naturalWidth, naturalHeight } = useHalftone(src, config);
+
   if (status === 'error') return <p className="stats-line">stats unavailable</p>;
-  if (status !== 'ready') return <p className="stats-line">computing…</p>;
+
+  // Gate on the result rather than `status === 'ready'`: the hook retains the
+  // previous result while a config change recomputes, so the numbers hold
+  // steady instead of blanking on every slider tick — same as the preview
+  // beside them. They lag by a frame while recomputing, so mark them stale.
+  if (naturalWidth === null || naturalHeight === null) {
+    return <p className="stats-line">computing…</p>;
+  }
+
   return (
-    <p className="stats-line">
+    <p className="stats-line" data-stale={status === 'processing' || undefined}>
       {circleCount.toLocaleString()} dots · {naturalWidth}×{naturalHeight}px source
     </p>
   );
