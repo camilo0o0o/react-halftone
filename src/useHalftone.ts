@@ -43,7 +43,10 @@ export function useHalftone(
     let cancelled = false;
     loadedRef.current = null;
     pixelCacheRef.current = null;
-    setState((prev) => ({ status: 'loading', error: null, result: prev.result }));
+    // Drop the old result: it belongs to the previous src, so keeping it on
+    // screen would show the wrong image. Retention is only for same-src
+    // recomputes (effect B).
+    setState({ status: 'loading', error: null, result: null });
 
     const image = loadImageElement(
       src,

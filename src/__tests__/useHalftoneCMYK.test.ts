@@ -200,6 +200,13 @@ describe('useHalftoneCMYK', () => {
       expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
 
+      // The first image's result must not linger while the second loads —
+      // it would render the old image under the new src.
+      expect(result.current.channels).toBeNull();
+      expect(result.current.naturalWidth).toBeNull();
+      expect(result.current.naturalHeight).toBeNull();
+      expect(result.current.totalCircleCount).toBe(0);
+
       triggerImageLoad(1);
       expect(result.current.status).toBe('ready');
     });
