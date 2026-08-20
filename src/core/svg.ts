@@ -1,6 +1,5 @@
 import type { Circle, ShapeType, CMYKChannel, CMYKChannelResult } from './types';
-
-const CMYK_DRAW_ORDER: CMYKChannel[] = ['c', 'm', 'y', 'k'];
+import { CMYK_CHANNELS } from './halftone';
 
 export function circleToPath(cx: number, cy: number, r: number): string {
   return `M${cx},${cy} m-${r},0 a${r},${r} 0 1,0 ${r * 2},0 a${r},${r} 0 1,0 -${r * 2},0 `;
@@ -40,7 +39,7 @@ export interface SVGRenderOptions {
 
 /**
  * Render a monochrome halftone result to a standalone SVG string.
- * Environment-agnostic — usable in the browser or at build time in Node.
+ * Pure string building: no React, no DOM.
  */
 export function renderHalftoneSVG(
   pathData: string,
@@ -63,14 +62,14 @@ export interface CMYKSVGRenderOptions {
 /**
  * Render a CMYK halftone result to a standalone SVG string using multiply
  * blending over a white background — the vector equivalent of the canvas output.
- * Environment-agnostic — usable in the browser or at build time in Node.
+ * Pure string building: no React, no DOM.
  */
 export function renderHalftoneCMYKSVG(
   channels: Record<CMYKChannel, CMYKChannelResult>,
   { width, height, shape = 'circle', cornerRadius = 0 }: CMYKSVGRenderOptions
 ): string {
   let groups = '';
-  for (const ch of CMYK_DRAW_ORDER) {
+  for (const ch of CMYK_CHANNELS) {
     const { circles, color } = channels[ch];
     if (circles.length === 0) continue;
     const d = generatePathData(circles, shape, cornerRadius);

@@ -187,7 +187,13 @@ export function calculateDisplayDimensions(
 
 export const CMYK_DEFAULT_ANGLES = { c: 15, m: 75, y: 0, k: 45 } as const;
 export const CMYK_CHANNEL_COLORS = { c: '#00FFFF', m: '#FF00FF', y: '#FFFF00', k: '#000000' } as const;
-const CMYK_CHANNELS: CMYKChannel[] = ['c', 'm', 'y', 'k'];
+
+/**
+ * The four channels in the order they must be composited: cyan, magenta and
+ * yellow first, black last. Iterate this rather than writing the array inline —
+ * renderers depend on the order, not just the membership.
+ */
+export const CMYK_CHANNELS: readonly CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
 export interface ValidatedCMYKChannelConfig {
   angle: number;
