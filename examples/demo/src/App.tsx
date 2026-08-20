@@ -1,8 +1,48 @@
 import { useState, useRef } from 'react';
-import { HalftoneCanvas, HalftoneCMYKCanvas } from 'react-halftone';
-import type { HalftoneCMYKHandle, ShapeType } from 'react-halftone';
+import { Halftone, HalftoneCanvas, HalftoneCMYKCanvas, useHalftone } from 'react-halftone';
+import type {
+  HalftoneCMYKHandle,
+  HalftoneFallback,
+  ShapeType,
+} from 'react-halftone';
 
 type Mode = 'mono' | 'cmyk';
+type Renderer = 'canvas' | 'svg';
+type StepBasis = 'min' | 'width';
+type PreviewBg = 'light' | 'dark' | 'checker';
+
+const COLOR_PRESETS = ['#000000', '#ffffff', '#e63946', '#1d4ed8', '#f77f00'];
+
+interface MonoStatsProps {
+  src: string;
+  step: number;
+  density: number;
+  color: string;
+  invert: boolean;
+  shape: ShapeType;
+  cornerRadius: number;
+  stepBasis: StepBasis;
+}
+
+function MonoStats({ src, ...config }: MonoStatsProps) {
+  const { status, circleCount, naturalWidth, naturalHeight } = useHalftone(src, config);
+
+  if (status === 'error') return <p className="stats-line">stats unavailable</p>;
+
+  // Gate on the result rather than `status === 'ready'`: the hook retains the
+  // previous result while a config change recomputes, so the numbers hold
+  // steady instead of blanking on every slider tick — same as the preview
+  // beside them. They lag by a frame while recomputing, so mark them stale.
+  if (naturalWidth === null || naturalHeight === null) {
+    return <p className="stats-line">computing…</p>;
+  }
+
+  return (
+    <p className="stats-line" data-stale={status === 'processing' || undefined}>
+      {circleCount.toLocaleString()} dots · {naturalWidth}×{naturalHeight}px source
+    </p>
+  );
+}
 
 export function App() {
   const cmykRef = useRef<HalftoneCMYKHandle>(null);
@@ -18,10 +58,16 @@ export function App() {
   const [density, setDensity] = useState(80);
   const [shape, setShape] = useState<ShapeType>('circle');
   const [cornerRadius, setCornerRadius] = useState(0);
+  const [stepBasis, setStepBasis] = useState<StepBasis>('min');
 
   // Mono controls
+  const [renderer, setRenderer] = useState<Renderer>('canvas');
   const [color, setColor] = useState('#000000');
   const [invert, setInvert] = useState(false);
+  const [showStats, setShowStats] = useState(true);
+
+  // Preview pane
+  const [previewBg, setPreviewBg] = useState<PreviewBg>('light');
 
   // CMYK angles
   const [angleC, setAngleC] = useState(15);
@@ -53,6 +99,26 @@ export function App() {
     link.click();
   }
 
+  const previewFallback: HalftoneFallback = (status) =>
+    status === 'loading' ? (
+      <p className="status-text">Loading image…</p>
+    ) : status === 'processing' ? (
+      <p className="status-text">Generating halftone…</p>
+    ) : null;
+
+  const monoProps = {
+    src: imageSrc,
+    step,
+    density,
+    color,
+    invert,
+    shape,
+    cornerRadius,
+    stepBasis,
+    width: 700,
+    fallback: previewFallback,
+  };
+
   return (
     <div className="app">
       <div className="controls">
@@ -77,6 +143,26 @@ export function App() {
         <div className="field">
           <input type="file" accept="image/*" onChange={handleFileUpload} />
         </div>
+
+        {mode === 'mono' && (
+          <>
+            <h2>Renderer</h2>
+            <div className="shape-toggle">
+              <button
+                className={renderer === 'canvas' ? 'active' : ''}
+                onClick={() => setRenderer('canvas')}
+              >
+                Canvas (raster)
+              </button>
+              <button
+                className={renderer === 'svg' ? 'active' : ''}
+                onClick={() => setRenderer('svg')}
+              >
+                SVG
+              </button>
+            </div>
+          </>
+        )}
 
         <h2>Grid</h2>
         <div className="field">
@@ -115,6 +201,23 @@ export function App() {
             value={density}
             onChange={(e) => setDensity(Number(e.target.value))}
           />
+        </div>
+        <div className="field">
+          <label>Step basis</label>
+          <div className="shape-toggle">
+            <button
+              className={stepBasis === 'min' ? 'active' : ''}
+              onClick={() => setStepBasis('min')}
+            >
+              min
+            </button>
+            <button
+              className={stepBasis === 'width' ? 'active' : ''}
+              onClick={() => setStepBasis('width')}
+            >
+              width
+            </button>
+          </div>
         </div>
 
         <h2>Shape</h2>
@@ -157,6 +260,17 @@ export function App() {
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
               />
+            </div>
+            <div className="swatch-row">
+              {COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  className={`swatch ${color === preset ? 'active' : ''}`}
+                  style={{ background: preset }}
+                  title={preset}
+                  onClick={() => setColor(preset)}
+                />
+              ))}
             </div>
             <div className="toggle-row">
               <input
@@ -255,27 +369,62 @@ export function App() {
             </button>
           </>
         )}
+
+        <h2>Preview</h2>
+        <div className="shape-toggle">
+          <button
+            className={previewBg === 'light' ? 'active' : ''}
+            onClick={() => setPreviewBg('light')}
+          >
+            Light
+          </button>
+          <button
+            className={previewBg === 'dark' ? 'active' : ''}
+            onClick={() => setPreviewBg('dark')}
+          >
+            Dark
+          </button>
+          <button
+            className={previewBg === 'checker' ? 'active' : ''}
+            onClick={() => setPreviewBg('checker')}
+          >
+            Checker
+          </button>
+        </div>
+        {mode === 'mono' && (
+          <>
+            <div className="toggle-row">
+              <input
+                type="checkbox"
+                id="stats"
+                checked={showStats}
+                onChange={(e) => setShowStats(e.target.checked)}
+              />
+              <label htmlFor="stats">Show dot count</label>
+            </div>
+            {showStats && (
+              <MonoStats
+                src={imageSrc}
+                step={step}
+                density={density}
+                color={color}
+                invert={invert}
+                shape={shape}
+                cornerRadius={cornerRadius}
+                stepBasis={stepBasis}
+              />
+            )}
+          </>
+        )}
       </div>
 
-      <div className="preview">
+      <div className={`preview bg-${previewBg}`}>
         {mode === 'mono' ? (
-          <HalftoneCanvas
-            src={imageSrc}
-            step={step}
-            density={density}
-            color={color}
-            invert={invert}
-            shape={shape}
-            cornerRadius={cornerRadius}
-            width={700}
-            fallback={(status) =>
-              status === 'loading' ? (
-                <p className="status-text">Loading image…</p>
-              ) : status === 'processing' ? (
-                <p className="status-text">Generating halftone…</p>
-              ) : null
-            }
-          />
+          renderer === 'svg' ? (
+            <Halftone {...monoProps} />
+          ) : (
+            <HalftoneCanvas {...monoProps} />
+          )
         ) : (
           <HalftoneCMYKCanvas
             ref={cmykRef}
@@ -284,6 +433,7 @@ export function App() {
             density={density}
             shape={shape}
             cornerRadius={cornerRadius}
+            stepBasis={stepBasis}
             channels={{
               c: { angle: angleC },
               m: { angle: angleM },
@@ -291,13 +441,7 @@ export function App() {
               k: { angle: angleK },
             }}
             width={700}
-            fallback={(status) =>
-              status === 'loading' ? (
-                <p className="status-text">Loading image…</p>
-              ) : status === 'processing' ? (
-                <p className="status-text">Generating halftone…</p>
-              ) : null
-            }
+            fallback={previewFallback}
           />
         )}
       </div>

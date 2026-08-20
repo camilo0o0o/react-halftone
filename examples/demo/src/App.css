@@ -55,11 +55,26 @@ body {
   font-size: 14px;
 }
 
-.preview canvas {
+.preview canvas,
+.preview svg {
   max-width: 100%;
   height: auto;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
+}
+
+.preview.bg-dark {
+  background: #1a1a1a;
+}
+
+.preview.bg-dark .status-text {
+  color: #aaa;
+}
+
+.preview.bg-checker {
+  background-color: #fff;
+  background-image: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%);
+  background-size: 24px 24px;
 }
 
 .mode-toggle {
@@ -221,4 +236,36 @@ body {
   height: 10px;
   border-radius: 50%;
   display: inline-block;
+}
+
+.swatch-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch.active {
+  outline: 2px solid #333;
+  outline-offset: 1px;
+}
+
+.stats-line {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 14px;
+}
+
+/* Numbers from the previous result, still on screen while the next one
+   computes — dimmed so a lagging count doesn't read as the current one. */
+.stats-line[data-stale] {
+  opacity: 0.45;
 }
