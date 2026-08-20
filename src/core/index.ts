@@ -28,10 +28,9 @@ import {
   generateChannelCircles,
   scaleCircles,
   CMYK_CHANNEL_COLORS,
+  CMYK_CHANNELS,
 } from './halftone';
 import { generatePathData } from './svg';
-
-const CMYK_CHANNELS: CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
 /**
  * Compute a monochrome halftone from raw RGBA pixels.

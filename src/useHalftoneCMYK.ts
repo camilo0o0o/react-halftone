@@ -11,11 +11,11 @@ import {
   calculateGrid,
   computeDownsampleScale,
   computeHalftoneCMYK,
+  CMYK_CHANNELS,
 } from './core';
 import { loadImageElement, extractPixels } from './getPixels';
 import type { LoadedImage, ExtractedPixels } from './getPixels';
 
-const CHANNEL_KEYS: CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
 interface State {
   status: HalftoneStatus;
@@ -102,7 +102,7 @@ export function useHalftoneCMYK(
 
         // The finest channel (smallest stepPx) drives the work resolution.
         let minStepPx = Infinity;
-        for (const ch of CHANNEL_KEYS) {
+        for (const ch of CMYK_CHANNELS) {
           const chConfig = validated.channels[ch];
           const { stepPx } = calculateGrid(
             naturalWidth, naturalHeight, chConfig.step, chConfig.density, validated.stepBasis
@@ -141,7 +141,7 @@ export function useHalftoneCMYK(
   }, [loadedVersion, config.step, config.density, config.shape, config.cornerRadius, config.stepBasis, JSON.stringify(config.channels)]);
 
   const totalCircleCount = state.result
-    ? CHANNEL_KEYS.reduce((sum, ch) => sum + state.result!.channels[ch].circles.length, 0)
+    ? CMYK_CHANNELS.reduce((sum, ch) => sum + state.result!.channels[ch].circles.length, 0)
     : 0;
 
   return {

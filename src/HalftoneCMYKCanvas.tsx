@@ -1,11 +1,9 @@
 import { forwardRef, useRef, useEffect, useImperativeHandle } from 'react';
 import type { ReactElement } from 'react';
-import type { HalftoneCMYKProps, HalftoneCMYKHandle, CMYKChannel } from './types';
-import { calculateDisplayDimensions, validateCMYKConfig } from './core';
+import type { HalftoneCMYKProps, HalftoneCMYKHandle } from './types';
+import { calculateDisplayDimensions, validateCMYKConfig, CMYK_CHANNELS } from './core';
 import { useHalftoneCMYK } from './useHalftoneCMYK';
 import { resolveFallback, useOnError } from './fallback';
-
-const DRAW_ORDER: CMYKChannel[] = ['c', 'm', 'y', 'k'];
 
 export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKProps>(
   function HalftoneCMYKCanvas(
@@ -63,7 +61,7 @@ export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKPro
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.globalCompositeOperation = 'multiply';
 
-      for (const ch of DRAW_ORDER) {
+      for (const ch of CMYK_CHANNELS) {
         const { circles, color } = channels[ch];
         if (circles.length === 0) continue;
 
