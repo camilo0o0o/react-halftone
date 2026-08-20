@@ -113,3 +113,26 @@
   );
   background-size: 24px 24px;
 }
+
+/* ── Narrow viewports ── */
+
+/* The side-by-side layout needs the sidebar's full 420px plus room for a
+   700px preview. Below that the two stack and the page scrolls as one,
+   instead of the sidebar squeezing the preview to nothing. */
+@media (max-width: 900px) {
+  .app {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    overflow-y: visible;
+  }
+
+  .preview {
+    min-height: 60vh;
+  }
+}

@@ -1,6 +1,39 @@
 /* Control primitives — the CSS vocabulary lifted from the style reference.
    Layout that composes them lives in app.css. */
 
+/* ── Focus ── */
+
+/* Zeroed radii and custom slider thumbs leave the platform focus ring almost
+   invisible against the ink borders, so everything focusable gets the accent
+   outline instead. The style reference has no focus styling at all. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Range thumbs and checkboxes sit tight against neighbours; pull the ring in. */
+input[type='range']:focus-visible,
+input[type='checkbox']:focus-visible {
+  outline-offset: 4px;
+}
+
+/* An accent ring on an accent fill is no ring at all — those flip to ink. */
+.toggle-btn.active:focus-visible,
+.btn-accent:focus-visible {
+  outline-color: var(--ink);
+}
+
+/* The file input is visually hidden, so its label wears the ring for it —
+   also ink, since the upload button is an accent fill too. */
+.upload-button:has(input[type='file']:focus-visible) {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.upload-button input[type='file']:focus-visible {
+  outline: none;
+}
+
 /* ── Card ── */
 
 .card {
