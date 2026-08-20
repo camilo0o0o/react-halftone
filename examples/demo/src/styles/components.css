@@ -1,0 +1,265 @@
+/* Control primitives — the CSS vocabulary lifted from the style reference.
+   Layout that composes them lives in app.css. */
+
+/* ── Card ── */
+
+.card {
+  background: var(--surface);
+  border: var(--border);
+  padding: var(--gap-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Detail row ── */
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--gap-sm);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* A value from the previous computation, still on screen while the next one
+   runs — dimmed so a lagging number doesn't read as the current one. */
+.detail-row[data-stale] {
+  opacity: 0.45;
+}
+
+/* ── Control (label + input stack) ── */
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.control-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--gap-sm);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.control-value {
+  font-weight: 400;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.control-row input[type='range'] {
+  flex: 1;
+}
+
+/* ── Segmented control ── */
+
+.segmented {
+  display: flex;
+}
+
+.toggle-btn {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+/* Collapse the shared edge so the group reads as one bordered strip. */
+.toggle-btn + .toggle-btn {
+  border-left: none;
+}
+
+.toggle-btn.active {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.toggle-btn:hover:not(.active) {
+  background: rgba(193, 116, 1, 0.1);
+}
+
+/* ── Buttons ── */
+
+.btn {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border: var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:hover {
+  opacity: 0.8;
+}
+
+.btn-ink {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.btn-block {
+  width: 100%;
+  padding: 12px 16px;
+}
+
+/* ── Upload button ── */
+
+.upload-button {
+  display: block;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 12px 28px;
+  background: var(--accent);
+  color: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.upload-button:hover {
+  opacity: 0.85;
+}
+
+/* Hidden visually but still focusable — see UploadButton.tsx. */
+.upload-button input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+
+/* ── Range slider ── */
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--ink);
+  outline: none;
+  /* Browsers round the track by default; the look demands square. */
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--ink);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/* ── Number input ── */
+
+input[type='number'] {
+  width: 76px;
+  padding: 6px 8px;
+  font-size: 14px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius);
+}
+
+/* ── Colour picker ── */
+
+input[type='color'] {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 2px;
+  background: none;
+  border: var(--border);
+  /* Same story as the range track — zeroed explicitly. */
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/* ── Swatches ── */
+
+.swatch-row {
+  display: flex;
+  gap: var(--gap-sm);
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.swatch.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Checkbox ── */
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.checkbox-label input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
