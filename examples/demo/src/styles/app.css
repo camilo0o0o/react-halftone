@@ -1,0 +1,150 @@
+/* Page layout: fixed sidebar of cards beside a preview that takes the rest. */
+
+.app {
+  display: flex;
+  height: 100vh;
+  padding: var(--gap-lg);
+  gap: var(--gap-lg);
+}
+
+.sidebar {
+  width: 420px;
+  min-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-lg);
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.app-title {
+  font-size: var(--text-app-title);
+  font-weight: 600;
+}
+
+/* ── Colour card ── */
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+/* ── Channels card ── */
+
+.channel-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.channel-label {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+/* Bordered because yellow on the card surface is otherwise invisible. */
+.channel-dot {
+  width: 10px;
+  height: 10px;
+  border: var(--border);
+}
+
+/* ── Preview ── */
+
+.preview {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+/* The border is the frame, and it stays constant across every background —
+   only the fill inside it changes. */
+.preview-frame {
+  flex: 1;
+  border: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: var(--gap-lg);
+}
+
+.preview-frame canvas,
+.preview-frame svg,
+.preview-frame img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Both canvas components set width AND height inline, in pixels. max-width
+   clamps the width when the frame is narrower than the image, but the plain
+   `height: auto` above can't beat an inline style — so the canvas kept its
+   full height at a reduced width and squashed horizontally. !important is
+   the only lever a consumer has over an inline style; the intrinsic ratio
+   comes from the canvas's own width/height attributes.
+   The svg and img paths set those as attributes, which CSS already wins
+   against, so this is scoped to canvas alone. */
+.preview-frame canvas {
+  height: auto !important;
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Fills come from the palette rather than generic white/black, so the frame
+   sits in the same world as the cards. */
+.preview-frame.bg-light {
+  background: var(--surface);
+}
+
+.preview-frame.bg-dark {
+  background: var(--ink);
+}
+
+.preview-frame.bg-dark .status-text {
+  color: var(--surface);
+}
+
+.preview-frame.bg-checker {
+  background-color: var(--surface);
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--ink) 15%, var(--surface)) 0% 25%,
+    var(--surface) 0% 50%
+  );
+  background-size: 24px 24px;
+}
+
+/* ── Narrow viewports ── */
+
+/* The side-by-side layout needs the sidebar's full 420px plus room for a
+   700px preview. Below that the two stack and the page scrolls as one,
+   instead of the sidebar squeezing the preview to nothing. */
+@media (max-width: 900px) {
+  .app {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    overflow-y: visible;
+  }
+
+  .preview {
+    min-height: 60vh;
+  }
+}

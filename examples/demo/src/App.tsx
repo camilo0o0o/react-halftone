@@ -1,17 +1,123 @@
-import { useState, useRef } from 'react';
-import { Halftone, HalftoneCanvas, HalftoneCMYKCanvas, useHalftone } from 'react-halftone';
+import { useRef, useState } from 'react';
+import {
+  Halftone,
+  HalftoneCanvas,
+  HalftoneCMYKCanvas,
+  useHalftone,
+  useHalftoneCMYK,
+} from 'react-halftone';
 import type {
+  CMYKChannelsConfig,
   HalftoneCMYKHandle,
   HalftoneFallback,
+  HalftoneStatus,
   ShapeType,
 } from 'react-halftone';
+import { Button } from './components/Button';
+import { Card } from './components/Card';
+import { Checkbox } from './components/Checkbox';
+import { DetailRow } from './components/DetailRow';
+import { SegmentedControl } from './components/SegmentedControl';
+import { Slider } from './components/Slider';
+import { SwatchRow } from './components/SwatchRow';
+import { UploadButton } from './components/UploadButton';
 
 type Mode = 'mono' | 'cmyk';
 type Renderer = 'canvas' | 'svg';
 type StepBasis = 'min' | 'width';
-type PreviewBg = 'light' | 'dark' | 'checker';
+/** `custom` is whatever the background colour picker last produced. */
+type PreviewBg = 'light' | 'dark' | 'checker' | 'custom';
+/** Shape, plus the escape hatch that shows the source image untouched. */
+type DisplayMode = ShapeType | 'original';
 
 const COLOR_PRESETS = ['#000000', '#ffffff', '#e63946', '#1d4ed8', '#f77f00'];
+
+const DEFAULTS = {
+  imageSrc: '/sample.jpeg',
+  mode: 'cmyk',
+  step: 5,
+  density: 80,
+  displayMode: 'circle',
+  cornerRadius: 0,
+  stepBasis: 'min',
+  renderer: 'canvas',
+  color: '#000000',
+  invert: false,
+  showStats: true,
+  previewBg: 'light',
+  customBg: '#d9d9d9',
+  angleC: 15,
+  angleM: 75,
+  angleY: 0,
+  angleK: 45,
+} as const;
+
+const MODE_OPTIONS: { value: Mode; label: string }[] = [
+  { value: 'mono', label: 'Monochrome' },
+  { value: 'cmyk', label: 'CMYK' },
+];
+
+const RENDERER_OPTIONS: { value: Renderer; label: string }[] = [
+  { value: 'canvas', label: 'Canvas' },
+  { value: 'svg', label: 'SVG' },
+];
+
+const STEP_BASIS_OPTIONS: { value: StepBasis; label: string }[] = [
+  { value: 'min', label: 'Min' },
+  { value: 'width', label: 'Width' },
+];
+
+const SHAPE_OPTIONS: { value: DisplayMode; label: string }[] = [
+  { value: 'circle', label: 'Circle' },
+  { value: 'square', label: 'Square' },
+  { value: 'original', label: 'Original' },
+];
+
+// No `custom` entry: picking a colour selects that state, and none of these
+// three staying lit is exactly the right signal that a custom fill is active.
+const PREVIEW_BG_OPTIONS: { value: PreviewBg; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'checker', label: 'Checker' },
+];
+
+const CHANNEL_SWATCHES = {
+  c: '#00ffff',
+  m: '#ff00ff',
+  y: '#ffff00',
+  k: '#000000',
+} as const;
+
+interface StatsViewProps {
+  status: HalftoneStatus;
+  naturalWidth: number | null;
+  naturalHeight: number | null;
+  dots: number;
+}
+
+function StatsView({ status, naturalWidth, naturalHeight, dots }: StatsViewProps) {
+  if (status === 'error') {
+    return <DetailRow label="Stats" value="unavailable" />;
+  }
+
+  // Gate on the result rather than `status === 'ready'`: the hooks retain the
+  // previous result while a config change recomputes, so the numbers hold
+  // steady instead of blanking on every slider tick — same as the preview
+  // beside them. They lag by a frame while recomputing, so mark them stale.
+  if (naturalWidth === null || naturalHeight === null) {
+    return <DetailRow label="Stats" value="computing…" />;
+  }
+
+  const stale = status === 'processing';
+
+  return (
+    <>
+      <DetailRow label="Width" value={`${naturalWidth}px`} stale={stale} />
+      <DetailRow label="Height" value={`${naturalHeight}px`} stale={stale} />
+      <DetailRow label="Dots" value={dots.toLocaleString()} stale={stale} />
+    </>
+  );
+}
 
 interface MonoStatsProps {
   src: string;
@@ -24,23 +130,45 @@ interface MonoStatsProps {
   stepBasis: StepBasis;
 }
 
+// Both stats components run the computation a second time, in parallel with
+// the one the preview component does — the rendering components don't expose
+// their counts. That's the price of the panel, and why it's behind a toggle.
 function MonoStats({ src, ...config }: MonoStatsProps) {
   const { status, circleCount, naturalWidth, naturalHeight } = useHalftone(src, config);
 
-  if (status === 'error') return <p className="stats-line">stats unavailable</p>;
+  return (
+    <StatsView
+      status={status}
+      naturalWidth={naturalWidth}
+      naturalHeight={naturalHeight}
+      dots={circleCount}
+    />
+  );
+}
 
-  // Gate on the result rather than `status === 'ready'`: the hook retains the
-  // previous result while a config change recomputes, so the numbers hold
-  // steady instead of blanking on every slider tick — same as the preview
-  // beside them. They lag by a frame while recomputing, so mark them stale.
-  if (naturalWidth === null || naturalHeight === null) {
-    return <p className="stats-line">computing…</p>;
-  }
+interface CmykStatsProps {
+  src: string;
+  step: number;
+  density: number;
+  shape: ShapeType;
+  cornerRadius: number;
+  stepBasis: StepBasis;
+  channels: CMYKChannelsConfig;
+}
+
+function CmykStats({ src, ...config }: CmykStatsProps) {
+  const { status, totalCircleCount, naturalWidth, naturalHeight } = useHalftoneCMYK(
+    src,
+    config
+  );
 
   return (
-    <p className="stats-line" data-stale={status === 'processing' || undefined}>
-      {circleCount.toLocaleString()} dots · {naturalWidth}×{naturalHeight}px source
-    </p>
+    <StatsView
+      status={status}
+      naturalWidth={naturalWidth}
+      naturalHeight={naturalHeight}
+      dots={totalCircleCount}
+    />
   );
 }
 
@@ -48,32 +176,38 @@ export function App() {
   const cmykRef = useRef<HalftoneCMYKHandle>(null);
 
   // Image source
-  const [imageSrc, setImageSrc] = useState('/sample.jpeg');
+  const [imageSrc, setImageSrc] = useState<string>(DEFAULTS.imageSrc);
 
   // Mode
-  const [mode, setMode] = useState<Mode>('cmyk');
+  const [mode, setMode] = useState<Mode>(DEFAULTS.mode);
 
   // Shared controls
-  const [step, setStep] = useState(5);
-  const [density, setDensity] = useState(80);
-  const [shape, setShape] = useState<ShapeType>('circle');
-  const [cornerRadius, setCornerRadius] = useState(0);
-  const [stepBasis, setStepBasis] = useState<StepBasis>('min');
+  const [step, setStep] = useState<number>(DEFAULTS.step);
+  const [density, setDensity] = useState<number>(DEFAULTS.density);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(DEFAULTS.displayMode);
+  const [cornerRadius, setCornerRadius] = useState<number>(DEFAULTS.cornerRadius);
+  const [stepBasis, setStepBasis] = useState<StepBasis>(DEFAULTS.stepBasis);
 
   // Mono controls
-  const [renderer, setRenderer] = useState<Renderer>('canvas');
-  const [color, setColor] = useState('#000000');
-  const [invert, setInvert] = useState(false);
-  const [showStats, setShowStats] = useState(true);
+  const [renderer, setRenderer] = useState<Renderer>(DEFAULTS.renderer);
+  const [color, setColor] = useState<string>(DEFAULTS.color);
+  const [invert, setInvert] = useState<boolean>(DEFAULTS.invert);
+  const [showStats, setShowStats] = useState<boolean>(DEFAULTS.showStats);
 
   // Preview pane
-  const [previewBg, setPreviewBg] = useState<PreviewBg>('light');
+  const [previewBg, setPreviewBg] = useState<PreviewBg>(DEFAULTS.previewBg);
+  const [customBg, setCustomBg] = useState<string>(DEFAULTS.customBg);
 
   // CMYK angles
-  const [angleC, setAngleC] = useState(15);
-  const [angleM, setAngleM] = useState(75);
-  const [angleY, setAngleY] = useState(0);
-  const [angleK, setAngleK] = useState(45);
+  const [angleC, setAngleC] = useState<number>(DEFAULTS.angleC);
+  const [angleM, setAngleM] = useState<number>(DEFAULTS.angleM);
+  const [angleY, setAngleY] = useState<number>(DEFAULTS.angleY);
+  const [angleK, setAngleK] = useState<number>(DEFAULTS.angleK);
+
+  // `original` isn't a shape the core knows about — it only decides whether
+  // the preview shows the halftone at all, so the halftone config keeps the
+  // last real shape's neighbour, circle.
+  const shape: ShapeType = displayMode === 'original' ? 'circle' : displayMode;
 
   // Step is shared by the slider and the exact-value number input; clamp to the
   // range the core accepts (min matches the core's MIN_STEP of 0.1).
@@ -82,12 +216,42 @@ export function App() {
     setStep(Math.min(10, Math.max(0.1, value)));
   }
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setImageSrc(url);
-    }
+  // Uploads hand out object URLs that stay alive until revoked, so every
+  // replacement of one has to release it first.
+  function replaceImageSrc(next: string) {
+    setImageSrc((current) => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current);
+      return next;
+    });
+  }
+
+  function handleFileUpload(file: File) {
+    replaceImageSrc(URL.createObjectURL(file));
+  }
+
+  function handleReset() {
+    replaceImageSrc(DEFAULTS.imageSrc);
+    setMode(DEFAULTS.mode);
+    setStep(DEFAULTS.step);
+    setDensity(DEFAULTS.density);
+    setDisplayMode(DEFAULTS.displayMode);
+    setCornerRadius(DEFAULTS.cornerRadius);
+    setStepBasis(DEFAULTS.stepBasis);
+    setRenderer(DEFAULTS.renderer);
+    setColor(DEFAULTS.color);
+    setInvert(DEFAULTS.invert);
+    setShowStats(DEFAULTS.showStats);
+    setPreviewBg(DEFAULTS.previewBg);
+    setCustomBg(DEFAULTS.customBg);
+    setAngleC(DEFAULTS.angleC);
+    setAngleM(DEFAULTS.angleM);
+    setAngleY(DEFAULTS.angleY);
+    setAngleK(DEFAULTS.angleK);
+  }
+
+  function handleCustomBg(value: string) {
+    setCustomBg(value);
+    setPreviewBg('custom');
   }
 
   function handleExport() {
@@ -106,6 +270,20 @@ export function App() {
       <p className="status-text">Generating halftone…</p>
     ) : null;
 
+  const channels: CMYKChannelsConfig = {
+    c: { angle: angleC },
+    m: { angle: angleM },
+    y: { angle: angleY },
+    k: { angle: angleK },
+  };
+
+  const angleControls: { channel: keyof typeof CHANNEL_SWATCHES; label: string; value: number; onChange: (v: number) => void }[] = [
+    { channel: 'c', label: 'Cyan', value: angleC, onChange: setAngleC },
+    { channel: 'm', label: 'Magenta', value: angleM, onChange: setAngleM },
+    { channel: 'y', label: 'Yellow', value: angleY, onChange: setAngleY },
+    { channel: 'k', label: 'Black (K)', value: angleK, onChange: setAngleK },
+  ];
+
   const monoProps = {
     src: imageSrc,
     step,
@@ -121,288 +299,20 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="controls">
-        <h1>react-halftone</h1>
+      <div className="sidebar">
+        <header className="sidebar-header">
+          <h1 className="app-title">react-halftone</h1>
+          {/* Per-section cards leave no single "Controls" header for this to
+              sit in, the way the style reference has it — the sidebar's own
+              header row plays that part instead. */}
+          <Button onClick={handleReset}>Reset</Button>
+        </header>
 
-        <div className="mode-toggle">
-          <button
-            className={mode === 'mono' ? 'active' : ''}
-            onClick={() => setMode('mono')}
-          >
-            Monochrome
-          </button>
-          <button
-            className={mode === 'cmyk' ? 'active' : ''}
-            onClick={() => setMode('cmyk')}
-          >
-            CMYK
-          </button>
-        </div>
+        <SegmentedControl value={mode} options={MODE_OPTIONS} onChange={setMode} />
 
-        <h2>Image</h2>
-        <div className="field">
-          <input type="file" accept="image/*" onChange={handleFileUpload} />
-        </div>
-
-        {mode === 'mono' && (
-          <>
-            <h2>Renderer</h2>
-            <div className="shape-toggle">
-              <button
-                className={renderer === 'canvas' ? 'active' : ''}
-                onClick={() => setRenderer('canvas')}
-              >
-                Canvas (raster)
-              </button>
-              <button
-                className={renderer === 'svg' ? 'active' : ''}
-                onClick={() => setRenderer('svg')}
-              >
-                SVG
-              </button>
-            </div>
-          </>
-        )}
-
-        <h2>Grid</h2>
-        <div className="field">
-          <label>
-            Step <span>{step}</span>
-          </label>
-          <div className="step-row">
-            <input
-              type="range"
-              min={0.1}
-              max={10}
-              step={0.1}
-              value={step}
-              onChange={(e) => setStepClamped(Number(e.target.value))}
-            />
-            <input
-              type="number"
-              className="step-number"
-              min={0.1}
-              max={10}
-              step={0.01}
-              value={step}
-              onChange={(e) => setStepClamped(Number(e.target.value))}
-            />
-          </div>
-        </div>
-        <div className="field">
-          <label>
-            Density <span>{density}%</span>
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={density}
-            onChange={(e) => setDensity(Number(e.target.value))}
-          />
-        </div>
-        <div className="field">
-          <label>Step basis</label>
-          <div className="shape-toggle">
-            <button
-              className={stepBasis === 'min' ? 'active' : ''}
-              onClick={() => setStepBasis('min')}
-            >
-              min
-            </button>
-            <button
-              className={stepBasis === 'width' ? 'active' : ''}
-              onClick={() => setStepBasis('width')}
-            >
-              width
-            </button>
-          </div>
-        </div>
-
-        <h2>Shape</h2>
-        <div className="shape-toggle">
-          <button
-            className={shape === 'circle' ? 'active' : ''}
-            onClick={() => setShape('circle')}
-          >
-            Circle
-          </button>
-          <button
-            className={shape === 'square' ? 'active' : ''}
-            onClick={() => setShape('square')}
-          >
-            Square
-          </button>
-        </div>
-        {shape === 'square' && (
-          <div className="field">
-            <label>
-              Corner Radius <span>{cornerRadius}%</span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={cornerRadius}
-              onChange={(e) => setCornerRadius(Number(e.target.value))}
-            />
-          </div>
-        )}
-
-        {mode === 'mono' && (
-          <>
-            <h2>Color</h2>
-            <div className="field">
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-              />
-            </div>
-            <div className="swatch-row">
-              {COLOR_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  className={`swatch ${color === preset ? 'active' : ''}`}
-                  style={{ background: preset }}
-                  title={preset}
-                  onClick={() => setColor(preset)}
-                />
-              ))}
-            </div>
-            <div className="toggle-row">
-              <input
-                type="checkbox"
-                id="invert"
-                checked={invert}
-                onChange={(e) => setInvert(e.target.checked)}
-              />
-              <label htmlFor="invert">Invert (for dark backgrounds)</label>
-            </div>
-          </>
-        )}
-
-        {mode === 'cmyk' && (
-          <>
-            <h2>Channel Angles</h2>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#00FFFF' }} />
-                Cyan
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleC}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleC}
-                  onChange={(e) => setAngleC(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#FF00FF' }} />
-                Magenta
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleM}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleM}
-                  onChange={(e) => setAngleM(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#FFFF00', border: '1px solid #ccc' }} />
-                Yellow
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleY}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleY}
-                  onChange={(e) => setAngleY(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="channel-group">
-              <div className="channel-label">
-                <span className="channel-dot" style={{ background: '#000000' }} />
-                Black (K)
-              </div>
-              <div className="field">
-                <label>
-                  Angle <span>{angleK}°</span>
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={angleK}
-                  onChange={(e) => setAngleK(Number(e.target.value))}
-                />
-              </div>
-            </div>
-
-            <button className="export-btn" onClick={handleExport}>
-              Export PNG
-            </button>
-          </>
-        )}
-
-        <h2>Preview</h2>
-        <div className="shape-toggle">
-          <button
-            className={previewBg === 'light' ? 'active' : ''}
-            onClick={() => setPreviewBg('light')}
-          >
-            Light
-          </button>
-          <button
-            className={previewBg === 'dark' ? 'active' : ''}
-            onClick={() => setPreviewBg('dark')}
-          >
-            Dark
-          </button>
-          <button
-            className={previewBg === 'checker' ? 'active' : ''}
-            onClick={() => setPreviewBg('checker')}
-          >
-            Checker
-          </button>
-        </div>
-        {mode === 'mono' && (
-          <>
-            <div className="toggle-row">
-              <input
-                type="checkbox"
-                id="stats"
-                checked={showStats}
-                onChange={(e) => setShowStats(e.target.checked)}
-              />
-              <label htmlFor="stats">Show dot count</label>
-            </div>
-            {showStats && (
+        {showStats && (
+          <Card title="Details">
+            {mode === 'mono' ? (
               <MonoStats
                 src={imageSrc}
                 step={step}
@@ -413,37 +323,189 @@ export function App() {
                 cornerRadius={cornerRadius}
                 stepBasis={stepBasis}
               />
+            ) : (
+              <CmykStats
+                src={imageSrc}
+                step={step}
+                density={density}
+                shape={shape}
+                cornerRadius={cornerRadius}
+                stepBasis={stepBasis}
+                channels={channels}
+              />
             )}
-          </>
+          </Card>
         )}
+
+        <Card title="Image">
+          <UploadButton label="Upload image" onFile={handleFileUpload} />
+        </Card>
+
+        {mode === 'mono' && (
+          <Card title="Renderer">
+            <SegmentedControl
+              value={renderer}
+              options={RENDERER_OPTIONS}
+              onChange={setRenderer}
+            />
+          </Card>
+        )}
+
+        <Card title="Grid">
+          <Slider
+            label="Step"
+            value={step}
+            min={0.1}
+            max={10}
+            step={0.1}
+            onChange={setStepClamped}
+          >
+            <input
+              type="number"
+              min={0.1}
+              max={10}
+              step={0.01}
+              value={step}
+              aria-label="Step, exact value"
+              onChange={(e) => setStepClamped(Number(e.target.value))}
+            />
+          </Slider>
+          <Slider
+            label="Density"
+            value={density}
+            display={`${density}%`}
+            min={0}
+            max={100}
+            step={1}
+            onChange={setDensity}
+          />
+          <SegmentedControl
+            label="Step basis"
+            value={stepBasis}
+            options={STEP_BASIS_OPTIONS}
+            onChange={setStepBasis}
+          />
+        </Card>
+
+        <Card title="Shape">
+          <SegmentedControl
+            value={displayMode}
+            options={SHAPE_OPTIONS}
+            onChange={setDisplayMode}
+          />
+          {displayMode === 'square' && (
+            <Slider
+              label="Corner radius"
+              value={cornerRadius}
+              display={`${cornerRadius}%`}
+              min={0}
+              max={100}
+              step={1}
+              onChange={setCornerRadius}
+            />
+          )}
+        </Card>
+
+        {mode === 'mono' && (
+          <Card title="Colour">
+            <div className="color-row">
+              <input
+                type="color"
+                value={color}
+                aria-label="Dot colour"
+                onChange={(e) => setColor(e.target.value)}
+              />
+              <SwatchRow colors={COLOR_PRESETS} value={color} onChange={setColor} />
+            </div>
+            <Checkbox
+              label="Invert (for dark backgrounds)"
+              checked={invert}
+              onChange={setInvert}
+            />
+          </Card>
+        )}
+
+        {mode === 'cmyk' && (
+          <Card title="Channels">
+            {angleControls.map(({ channel, label, value, onChange }) => (
+              <div className="channel-group" key={channel}>
+                <span className="channel-label">
+                  <span
+                    className="channel-dot"
+                    style={{ background: CHANNEL_SWATCHES[channel] }}
+                  />
+                  {label}
+                </span>
+                <Slider
+                  label="Angle"
+                  value={value}
+                  display={`${value}°`}
+                  min={0}
+                  max={360}
+                  step={1}
+                  onChange={onChange}
+                />
+              </div>
+            ))}
+            <Button variant="accent" block onClick={handleExport}>
+              Export PNG
+            </Button>
+          </Card>
+        )}
+
+        <Card title="Preview">
+          <SegmentedControl
+            label="Background"
+            value={previewBg}
+            options={PREVIEW_BG_OPTIONS}
+            onChange={setPreviewBg}
+          />
+          <div className="color-row">
+            <input
+              type="color"
+              value={customBg}
+              aria-label="Custom background colour"
+              onChange={(e) => handleCustomBg(e.target.value)}
+            />
+            <span className="control-value">
+              {previewBg === 'custom' ? customBg : 'Pick a custom background'}
+            </span>
+          </div>
+          <Checkbox label="Show dot count" checked={showStats} onChange={setShowStats} />
+        </Card>
       </div>
 
-      <div className={`preview bg-${previewBg}`}>
-        {mode === 'mono' ? (
-          renderer === 'svg' ? (
-            <Halftone {...monoProps} />
+      <div className="preview">
+        {/* Framed in CSS on purpose: the library components keep rendering
+            their own canvas/svg, so the renderer toggle still exercises both
+            paths. The frame is never part of what they draw. */}
+        <div
+          className={`preview-frame bg-${previewBg}`}
+          style={previewBg === 'custom' ? { background: customBg } : undefined}
+        >
+          {displayMode === 'original' ? (
+            <img src={imageSrc} alt="Source image, unprocessed" />
+          ) : mode === 'mono' ? (
+            renderer === 'svg' ? (
+              <Halftone {...monoProps} />
+            ) : (
+              <HalftoneCanvas {...monoProps} />
+            )
           ) : (
-            <HalftoneCanvas {...monoProps} />
-          )
-        ) : (
-          <HalftoneCMYKCanvas
-            ref={cmykRef}
-            src={imageSrc}
-            step={step}
-            density={density}
-            shape={shape}
-            cornerRadius={cornerRadius}
-            stepBasis={stepBasis}
-            channels={{
-              c: { angle: angleC },
-              m: { angle: angleM },
-              y: { angle: angleY },
-              k: { angle: angleK },
-            }}
-            width={700}
-            fallback={previewFallback}
-          />
-        )}
+            <HalftoneCMYKCanvas
+              ref={cmykRef}
+              src={imageSrc}
+              step={step}
+              density={density}
+              shape={shape}
+              cornerRadius={cornerRadius}
+              stepBasis={stepBasis}
+              channels={channels}
+              width={700}
+              fallback={previewFallback}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

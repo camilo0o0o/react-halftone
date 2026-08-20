@@ -1,0 +1,55 @@
+/* Design tokens + base reset for the demo.
+   The style reference hardcodes these hexes throughout; centralising them as
+   custom properties is the one deliberate deviation from it at token level. */
+
+:root {
+  --page: #d9d9d9;
+  --surface: #f7f7f7;
+  --ink: #333333;
+  --accent: #c17401;
+
+  --font: 'Spline Sans Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --border-width: 2px;
+  --border: var(--border-width) solid var(--ink);
+  --radius: 0;
+
+  --gap-lg: 24px;
+  --gap-md: 16px;
+  --gap-sm: 8px;
+
+  /* Cards sit one step in from the page padding. */
+  --card-padding: 20px;
+
+  /* Sidebar type scale, kept deliberately quiet: this is an instrument panel,
+     and titles that compete with the preview make every card read as a
+     component in its own right. Weights sit one step below where a heading
+     scale would normally put them. */
+  --text-title: 11px;
+  --text-body: 12px;
+  --text-lead: 13px;
+  --text-app-title: 16px;
+}
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* Form controls inherit neither the page font nor its colour on any browser. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
