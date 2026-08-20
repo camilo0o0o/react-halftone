@@ -390,27 +390,32 @@ export function App() {
         </Card>
       </div>
 
-      <div className={`preview bg-${previewBg}`}>
-        {mode === 'mono' ? (
-          renderer === 'svg' ? (
-            <Halftone {...monoProps} />
+      <div className="preview">
+        {/* Framed in CSS on purpose: the library components keep rendering
+            their own canvas/svg, so the renderer toggle still exercises both
+            paths. The frame is never part of what they draw. */}
+        <div className={`preview-frame bg-${previewBg}`}>
+          {mode === 'mono' ? (
+            renderer === 'svg' ? (
+              <Halftone {...monoProps} />
+            ) : (
+              <HalftoneCanvas {...monoProps} />
+            )
           ) : (
-            <HalftoneCanvas {...monoProps} />
-          )
-        ) : (
-          <HalftoneCMYKCanvas
-            ref={cmykRef}
-            src={imageSrc}
-            step={step}
-            density={density}
-            shape={shape}
-            cornerRadius={cornerRadius}
-            stepBasis={stepBasis}
-            channels={channels}
-            width={700}
-            fallback={previewFallback}
-          />
-        )}
+            <HalftoneCMYKCanvas
+              ref={cmykRef}
+              src={imageSrc}
+              step={step}
+              density={density}
+              shape={shape}
+              cornerRadius={cornerRadius}
+              stepBasis={stepBasis}
+              channels={channels}
+              width={700}
+              fallback={previewFallback}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

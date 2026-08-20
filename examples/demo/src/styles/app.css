@@ -65,16 +65,23 @@
   flex: 1;
   min-width: 0;
   display: flex;
+}
+
+/* The border is the frame, and it stays constant across every background —
+   only the fill inside it changes. */
+.preview-frame {
+  flex: 1;
+  border: var(--border);
+  display: flex;
   align-items: center;
   justify-content: center;
   overflow: auto;
   padding: var(--gap-lg);
-  background: var(--surface);
 }
 
-.preview canvas,
-.preview svg,
-.preview img {
+.preview-frame canvas,
+.preview-frame svg,
+.preview-frame img {
   max-width: 100%;
   height: auto;
 }
@@ -84,16 +91,25 @@
   font-weight: 500;
 }
 
-.preview.bg-dark {
-  background: #1a1a1a;
+/* Fills come from the palette rather than generic white/black, so the frame
+   sits in the same world as the cards. */
+.preview-frame.bg-light {
+  background: var(--surface);
 }
 
-.preview.bg-dark .status-text {
+.preview-frame.bg-dark {
+  background: var(--ink);
+}
+
+.preview-frame.bg-dark .status-text {
   color: var(--surface);
 }
 
-.preview.bg-checker {
-  background-color: #fff;
-  background-image: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%);
+.preview-frame.bg-checker {
+  background-color: var(--surface);
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--ink) 15%, var(--surface)) 0% 25%,
+    var(--surface) 0% 50%
+  );
   background-size: 24px 24px;
 }
