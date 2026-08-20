@@ -1,7 +1,7 @@
 import { forwardRef, useRef, useEffect, useCallback } from 'react';
 import type { ReactElement } from 'react';
 import type { HalftoneProps } from './types';
-import { calculateDisplayDimensions } from './core';
+import { calculateDisplayDimensions, validateConfig } from './core';
 import { useHalftone } from './useHalftone';
 import { resolveFallback, useOnError } from './fallback';
 
@@ -45,7 +45,14 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
 
     useOnError(status, error, onError);
 
-    const fillColor = color ?? '#000000';
+    // Run the draw-only props through the same validation the SVG path gets,
+    // so both renderers clamp and fall back identically. Destructured to
+    // primitives to keep the draw effect's deps stable.
+    const {
+      color: fillColor,
+      shape: dotShape,
+      cornerRadius: cr,
+    } = validateConfig({ color, shape, cornerRadius });
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -58,9 +65,6 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = fillColor;
-
-      const dotShape = shape ?? 'circle';
-      const cr = cornerRadius ?? 0;
 
       if (dotShape === 'circle') {
         ctx.beginPath();
@@ -82,7 +86,7 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
           ctx.fill();
         }
       }
-    }, [circles, fillColor, shape, cornerRadius]);
+    }, [circles, fillColor, dotShape, cr]);
 
     // Gate on the result, not the status: during a config recompute the hook
     // retains the previous result, so the canvas stays mounted (no flicker,

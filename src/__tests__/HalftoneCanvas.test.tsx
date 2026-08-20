@@ -189,6 +189,40 @@ describe('HalftoneCanvas component', () => {
     });
   });
 
+  // The canvas path used to read these props raw while the SVG path ran them
+  // through validateConfig, so the two renderers disagreed on bad input.
+  describe('prop validation matches the SVG path', () => {
+    it('clamps an out-of-range cornerRadius to 100', () => {
+      render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={500} />);
+      // cornerRadius 100 of a radius-5 dot => 5, not 25.
+      expect(mockCtx.roundRect).toHaveBeenCalledWith(5, 5, 10, 10, 5);
+    });
+
+    it('clamps a negative cornerRadius to 0 (plain square)', () => {
+      render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={-20} />);
+      expect(mockCtx.fillRect).toHaveBeenCalledWith(5, 5, 10, 10);
+      expect(mockCtx.roundRect).not.toHaveBeenCalled();
+    });
+
+    it('treats NaN cornerRadius as 0 rather than passing NaN to roundRect', () => {
+      render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={NaN} />);
+      expect(mockCtx.roundRect).not.toHaveBeenCalled();
+      expect(mockCtx.fillRect).toHaveBeenCalledWith(5, 5, 10, 10);
+    });
+
+    it('falls back to circles for an unknown shape', () => {
+      render(<HalftoneCanvas src="test.png" shape={'triangle' as any} />);
+      expect(mockCtx.arc).toHaveBeenCalledWith(10, 10, 5, 0, Math.PI * 2);
+      expect(mockCtx.fillRect).not.toHaveBeenCalled();
+    });
+
+    it('falls back to #000000 for an invalid color', () => {
+      render(<HalftoneCanvas src="test.png" color="not-a-color" />);
+      const setter = Object.getOwnPropertyDescriptor(mockCtx, 'fillStyle')!.set!;
+      expect(setter).toHaveBeenCalledWith('#000000');
+    });
+  });
+
   describe('props forwarding', () => {
     it('forwards shape and cornerRadius to useHalftone', () => {
       render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={30} />);

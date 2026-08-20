@@ -1,7 +1,7 @@
 import { forwardRef, useRef, useEffect, useImperativeHandle } from 'react';
 import type { ReactElement } from 'react';
 import type { HalftoneCMYKProps, HalftoneCMYKHandle, CMYKChannel } from './types';
-import { calculateDisplayDimensions } from './core';
+import { calculateDisplayDimensions, validateCMYKConfig } from './core';
 import { useHalftoneCMYK } from './useHalftoneCMYK';
 import { resolveFallback, useOnError } from './fallback';
 
@@ -46,8 +46,10 @@ export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKPro
 
     useOnError(status, error, onError);
 
-    const dotShape = shape ?? 'circle';
-    const cr = cornerRadius ?? 0;
+    // Run the draw-only props through the same validation the core applies,
+    // so an out-of-range cornerRadius or unknown shape behaves identically
+    // here and in the SVG renderer.
+    const { shape: dotShape, cornerRadius: cr } = validateCMYKConfig({ shape, cornerRadius });
 
     useEffect(() => {
       const canvas = canvasRef.current;
