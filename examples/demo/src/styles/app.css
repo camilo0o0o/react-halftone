@@ -86,6 +86,18 @@
   height: auto;
 }
 
+/* Both canvas components set width AND height inline, in pixels. max-width
+   clamps the width when the frame is narrower than the image, but the plain
+   `height: auto` above can't beat an inline style — so the canvas kept its
+   full height at a reduced width and squashed horizontally. !important is
+   the only lever a consumer has over an inline style; the intrinsic ratio
+   comes from the canvas's own width/height attributes.
+   The svg and img paths set those as attributes, which CSS already wins
+   against, so this is scoped to canvas alone. */
+.preview-frame canvas {
+  height: auto !important;
+}
+
 .status-text {
   font-size: 14px;
   font-weight: 500;
