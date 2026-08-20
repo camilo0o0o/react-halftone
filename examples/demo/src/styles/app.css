@@ -24,8 +24,8 @@
 }
 
 .app-title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: var(--text-app-title);
+  font-weight: 600;
 }
 
 /* ── Colour card ── */
@@ -48,14 +48,14 @@
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--text-body);
+  font-weight: 600;
 }
 
 /* Bordered because yellow on the card surface is otherwise invisible. */
 .channel-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border: var(--border);
 }
 

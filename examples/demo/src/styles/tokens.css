@@ -17,6 +17,18 @@
   --gap-lg: 24px;
   --gap-md: 16px;
   --gap-sm: 8px;
+
+  /* Cards sit one step in from the page padding. */
+  --card-padding: 20px;
+
+  /* Sidebar type scale, kept deliberately quiet: this is an instrument panel,
+     and titles that compete with the preview make every card read as a
+     component in its own right. Weights sit one step below where a heading
+     scale would normally put them. */
+  --text-title: 11px;
+  --text-body: 12px;
+  --text-lead: 13px;
+  --text-app-title: 16px;
 }
 
 *,
