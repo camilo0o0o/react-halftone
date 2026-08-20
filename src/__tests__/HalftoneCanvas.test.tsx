@@ -284,5 +284,46 @@ describe('HalftoneCanvas component', () => {
       render(<HalftoneCanvas src="test.png" onError={onError} />);
       expect(onError).not.toHaveBeenCalled();
     });
+
+    // Callers pass inline arrows, so a fresh identity every render must not
+    // count as a new error.
+    it('does not re-fire onError when a re-render brings a new handler identity', () => {
+      const onError = vi.fn();
+      const err = new Error('boom');
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: err, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+
+      render(<HalftoneCanvas src="bad.png" onError={(e) => onError(e)} />);
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      render(<HalftoneCanvas src="bad.png" onError={(e) => onError(e)} />);
+      render(<HalftoneCanvas src="bad.png" onError={(e) => onError(e)} />);
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+
+    // An onError that sets state re-renders the parent with a new inline
+    // handler; depending on that identity used to loop until React bailed out.
+    it('survives an onError that sets state', () => {
+      const err = new Error('boom');
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: err, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+
+      const seen: Error[] = [];
+      function Parent() {
+        const [caught, setCaught] = React.useState<Error | null>(null);
+        return (
+          <HalftoneCanvas
+            src="bad.png"
+            onError={(e) => {
+              seen.push(e);
+              setCaught(e);
+            }}
+            fallback={<span className="ph">{caught ? 'caught' : 'waiting'}</span>}
+          />
+        );
+      }
+
+      render(<Parent />);
+      expect(seen).toHaveLength(1);
+      expect(container.querySelector('.ph')?.textContent).toBe('caught');
+    });
   });
 });
