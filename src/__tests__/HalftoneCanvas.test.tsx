@@ -97,10 +97,28 @@ describe('HalftoneCanvas component', () => {
       expect(container.querySelector('canvas')).toBeNull();
     });
 
-    it('returns null when circles array is empty', () => {
-      mockHookResult = { ...defaultHookResult, circles: [] };
+    // An empty circles array is a valid result (a blank image), not a
+    // not-ready signal — it mounts an empty canvas so refs stay usable.
+    it('mounts an empty canvas when circles array is empty', () => {
+      mockHookResult = { ...defaultHookResult, circles: [], circleCount: 0 };
       render(<HalftoneCanvas src="test.png" />);
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, 100, 100);
+      expect(mockCtx.arc).not.toHaveBeenCalled();
+    });
+
+    // Recomputing on a config change keeps the previous result, so the canvas
+    // must not unmount mid-drag.
+    it('stays mounted while recomputing with a retained result', () => {
+      const ref = createRef<HTMLCanvasElement>();
+      render(<HalftoneCanvas ref={ref} src="test.png" step={10} />);
+      expect(ref.current).toBeInstanceOf(HTMLCanvasElement);
+
+      mockHookResult = { ...defaultHookResult, status: 'processing' as HalftoneStatus };
+      render(<HalftoneCanvas ref={ref} src="test.png" step={20} />);
+
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(ref.current).toBeInstanceOf(HTMLCanvasElement);
     });
   });
 

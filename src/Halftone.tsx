@@ -25,7 +25,10 @@ export function Halftone({
 
   useOnError(status, error, onError);
 
-  if (status !== 'ready' || !pathData || naturalWidth === null || naturalHeight === null) {
+  // Gate on the result, not the status: during a config recompute the hook
+  // retains the previous result, so the svg stays mounted (no flicker). An
+  // empty-string pathData is a real result (a blank image) and still mounts.
+  if (pathData === null || naturalWidth === null || naturalHeight === null) {
     return (resolveFallback(fallback, status, error) as JSX.Element | null) ?? null;
   }
 

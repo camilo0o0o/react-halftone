@@ -49,7 +49,9 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
 
     useEffect(() => {
       const canvas = canvasRef.current;
-      if (!canvas || !circles || circles.length === 0) return;
+      // An empty circles array is a real result (a blank image) — still clear,
+      // or a previous frame's dots would stay painted.
+      if (!canvas || !circles) return;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -82,7 +84,10 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
       }
     }, [circles, fillColor, shape, cornerRadius]);
 
-    if (status !== 'ready' || !circles || circles.length === 0 || naturalWidth === null || naturalHeight === null) {
+    // Gate on the result, not the status: during a config recompute the hook
+    // retains the previous result, so the canvas stays mounted (no flicker,
+    // and forwarded refs stay valid).
+    if (circles === null || naturalWidth === null || naturalHeight === null) {
       return (resolveFallback(fallback, status, error) as ReactElement | null) ?? null;
     }
 

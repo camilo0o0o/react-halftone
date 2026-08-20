@@ -113,6 +113,20 @@ describe('HalftoneCMYK component', () => {
       render(<HalftoneCMYKCanvas src="bad.png" />);
       expect(container.querySelector('canvas')).toBeNull();
     });
+
+    // Recomputing on a config change keeps the previous result, so the canvas
+    // must not unmount mid-drag — the imperative export handle depends on it.
+    it('stays mounted while recomputing with a retained result', () => {
+      const ref = createRef<HalftoneCMYKHandle>();
+      render(<HalftoneCMYKCanvas ref={ref} src="test.png" step={10} />);
+      expect(ref.current?.getCanvas()).toBeInstanceOf(HTMLCanvasElement);
+
+      mockHookResult = { ...mockHookResult, status: 'processing' as HalftoneStatus };
+      render(<HalftoneCMYKCanvas ref={ref} src="test.png" step={20} />);
+
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(ref.current?.getCanvas()).toBeInstanceOf(HTMLCanvasElement);
+    });
   });
 
   describe('canvas attributes', () => {

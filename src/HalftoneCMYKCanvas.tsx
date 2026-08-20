@@ -92,7 +92,10 @@ export const HalftoneCMYKCanvas = forwardRef<HalftoneCMYKHandle, HalftoneCMYKPro
       ctx.globalCompositeOperation = 'source-over';
     }, [channels, dotShape, cr]);
 
-    if (status !== 'ready' || !channels || naturalWidth === null || naturalHeight === null) {
+    // Gate on the result, not the status: during a config recompute the hook
+    // retains the previous result, so the canvas stays mounted (no flicker,
+    // and the imperative toDataURL/toBlob handle keeps working mid-drag).
+    if (channels === null || naturalWidth === null || naturalHeight === null) {
       return (resolveFallback(fallback, status, error) as ReactElement | null) ?? null;
     }
 

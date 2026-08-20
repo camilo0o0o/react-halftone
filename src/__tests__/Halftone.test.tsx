@@ -71,6 +71,25 @@ describe('Halftone component', () => {
       render(<Halftone src="" />);
       expect(container.querySelector('svg')).toBeNull();
     });
+
+    // Empty pathData is a valid result (a blank image), not a not-ready signal.
+    it('mounts an empty svg when pathData is an empty string', () => {
+      mockHookResult = { ...defaultHookResult, circles: [], pathData: '', circleCount: 0 };
+      render(<Halftone src="test.png" />);
+      expect(container.querySelector('svg')).not.toBeNull();
+      expect(container.querySelector('path')?.getAttribute('d')).toBe('');
+    });
+
+    // Recomputing on a config change keeps the previous result, so the svg
+    // must not unmount mid-drag.
+    it('stays mounted while recomputing with a retained result', () => {
+      render(<Halftone src="test.png" step={10} />);
+      expect(container.querySelector('svg')).not.toBeNull();
+
+      mockHookResult = { ...defaultHookResult, status: 'processing' as HalftoneStatus };
+      render(<Halftone src="test.png" step={20} />);
+      expect(container.querySelector('svg')).not.toBeNull();
+    });
   });
 
   describe('SVG output', () => {
