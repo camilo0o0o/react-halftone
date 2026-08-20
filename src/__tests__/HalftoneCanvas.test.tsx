@@ -97,10 +97,28 @@ describe('HalftoneCanvas component', () => {
       expect(container.querySelector('canvas')).toBeNull();
     });
 
-    it('returns null when circles array is empty', () => {
-      mockHookResult = { ...defaultHookResult, circles: [] };
+    // An empty circles array is a valid result (a blank image), not a
+    // not-ready signal — it mounts an empty canvas so refs stay usable.
+    it('mounts an empty canvas when circles array is empty', () => {
+      mockHookResult = { ...defaultHookResult, circles: [], circleCount: 0 };
       render(<HalftoneCanvas src="test.png" />);
-      expect(container.querySelector('canvas')).toBeNull();
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, 100, 100);
+      expect(mockCtx.arc).not.toHaveBeenCalled();
+    });
+
+    // Recomputing on a config change keeps the previous result, so the canvas
+    // must not unmount mid-drag.
+    it('stays mounted while recomputing with a retained result', () => {
+      const ref = createRef<HTMLCanvasElement>();
+      render(<HalftoneCanvas ref={ref} src="test.png" step={10} />);
+      expect(ref.current).toBeInstanceOf(HTMLCanvasElement);
+
+      mockHookResult = { ...defaultHookResult, status: 'processing' as HalftoneStatus };
+      render(<HalftoneCanvas ref={ref} src="test.png" step={20} />);
+
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(ref.current).toBeInstanceOf(HTMLCanvasElement);
     });
   });
 
@@ -168,6 +186,40 @@ describe('HalftoneCanvas component', () => {
       expect(mockCtx.beginPath).toHaveBeenCalled();
       expect(mockCtx.roundRect).toHaveBeenCalledWith(5, 5, 10, 10, 2.5);
       expect(mockCtx.fill).toHaveBeenCalled();
+    });
+  });
+
+  // The canvas path used to read these props raw while the SVG path ran them
+  // through validateConfig, so the two renderers disagreed on bad input.
+  describe('prop validation matches the SVG path', () => {
+    it('clamps an out-of-range cornerRadius to 100', () => {
+      render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={500} />);
+      // cornerRadius 100 of a radius-5 dot => 5, not 25.
+      expect(mockCtx.roundRect).toHaveBeenCalledWith(5, 5, 10, 10, 5);
+    });
+
+    it('clamps a negative cornerRadius to 0 (plain square)', () => {
+      render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={-20} />);
+      expect(mockCtx.fillRect).toHaveBeenCalledWith(5, 5, 10, 10);
+      expect(mockCtx.roundRect).not.toHaveBeenCalled();
+    });
+
+    it('treats NaN cornerRadius as 0 rather than passing NaN to roundRect', () => {
+      render(<HalftoneCanvas src="test.png" shape="square" cornerRadius={NaN} />);
+      expect(mockCtx.roundRect).not.toHaveBeenCalled();
+      expect(mockCtx.fillRect).toHaveBeenCalledWith(5, 5, 10, 10);
+    });
+
+    it('falls back to circles for an unknown shape', () => {
+      render(<HalftoneCanvas src="test.png" shape={'triangle' as any} />);
+      expect(mockCtx.arc).toHaveBeenCalledWith(10, 10, 5, 0, Math.PI * 2);
+      expect(mockCtx.fillRect).not.toHaveBeenCalled();
+    });
+
+    it('falls back to #000000 for an invalid color', () => {
+      render(<HalftoneCanvas src="test.png" color="not-a-color" />);
+      const setter = Object.getOwnPropertyDescriptor(mockCtx, 'fillStyle')!.set!;
+      expect(setter).toHaveBeenCalledWith('#000000');
     });
   });
 
@@ -265,6 +317,47 @@ describe('HalftoneCanvas component', () => {
       const onError = vi.fn();
       render(<HalftoneCanvas src="test.png" onError={onError} />);
       expect(onError).not.toHaveBeenCalled();
+    });
+
+    // Callers pass inline arrows, so a fresh identity every render must not
+    // count as a new error.
+    it('does not re-fire onError when a re-render brings a new handler identity', () => {
+      const onError = vi.fn();
+      const err = new Error('boom');
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: err, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+
+      render(<HalftoneCanvas src="bad.png" onError={(e) => onError(e)} />);
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      render(<HalftoneCanvas src="bad.png" onError={(e) => onError(e)} />);
+      render(<HalftoneCanvas src="bad.png" onError={(e) => onError(e)} />);
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+
+    // An onError that sets state re-renders the parent with a new inline
+    // handler; depending on that identity used to loop until React bailed out.
+    it('survives an onError that sets state', () => {
+      const err = new Error('boom');
+      mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: err, circles: null, pathData: null, naturalWidth: null, naturalHeight: null, circleCount: 0 };
+
+      const seen: Error[] = [];
+      function Parent() {
+        const [caught, setCaught] = React.useState<Error | null>(null);
+        return (
+          <HalftoneCanvas
+            src="bad.png"
+            onError={(e) => {
+              seen.push(e);
+              setCaught(e);
+            }}
+            fallback={<span className="ph">{caught ? 'caught' : 'waiting'}</span>}
+          />
+        );
+      }
+
+      render(<Parent />);
+      expect(seen).toHaveLength(1);
+      expect(container.querySelector('.ph')?.textContent).toBe('caught');
     });
   });
 });

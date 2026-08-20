@@ -109,10 +109,25 @@ describe('generateChannelCircles', () => {
     }
   });
 
-  it('near-white pixels (251,251,251) are skipped by early-exit', () => {
-    const pixels = makePixels(W, H, '#fbfbfb');
-    const kCircles = generateChannelCircles(pixels, W, H, gridPoints, maxRadius, 'k');
-    expect(kCircles.length).toBe(0);
+  // Highlights used to be culled at a hard source value of 250, so dot size
+  // fell off a cliff there instead of fading out. The computed radius is now
+  // the only cull, so near-white tones stay continuous.
+  it('near-white tones fade continuously instead of banding at 250', () => {
+    // At maxRadius 40 every one of these clears the 0.1 floor on its own.
+    const bigRadius = 40;
+    const radii = ['#fafafa', '#fbfbfb', '#fcfcfc', '#fdfdfd'].map((hex) => {
+      const circles = generateChannelCircles(
+        makePixels(W, H, hex), W, H, gridPoints, bigRadius, 'k'
+      );
+      expect(circles.length).toBeGreaterThan(0);
+      return circles[0].r;
+    });
+
+    // 250 → 251 → 252 → 253: strictly shrinking, no drop to zero.
+    for (let i = 1; i < radii.length; i++) {
+      expect(radii[i]).toBeLessThan(radii[i - 1]);
+      expect(radii[i]).toBeGreaterThan(0);
+    }
   });
 
   it('off-white pixels (240,240,240) still produce dots', () => {

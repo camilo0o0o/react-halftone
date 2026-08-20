@@ -51,6 +51,7 @@ beforeEach(() => {
     moveTo: vi.fn(),
     fill: vi.fn(),
     fillRect: vi.fn(),
+    rect: vi.fn(),
     roundRect: vi.fn(),
   };
 
@@ -112,6 +113,20 @@ describe('HalftoneCMYK component', () => {
       mockHookResult = { ...defaultHookResult, status: 'error' as HalftoneStatus, error: new Error('fail'), channels: null, naturalWidth: null, naturalHeight: null, totalCircleCount: 0 };
       render(<HalftoneCMYKCanvas src="bad.png" />);
       expect(container.querySelector('canvas')).toBeNull();
+    });
+
+    // Recomputing on a config change keeps the previous result, so the canvas
+    // must not unmount mid-drag — the imperative export handle depends on it.
+    it('stays mounted while recomputing with a retained result', () => {
+      const ref = createRef<HalftoneCMYKHandle>();
+      render(<HalftoneCMYKCanvas ref={ref} src="test.png" step={10} />);
+      expect(ref.current?.getCanvas()).toBeInstanceOf(HTMLCanvasElement);
+
+      mockHookResult = { ...mockHookResult, status: 'processing' as HalftoneStatus };
+      render(<HalftoneCMYKCanvas ref={ref} src="test.png" step={20} />);
+
+      expect(container.querySelector('canvas')).not.toBeNull();
+      expect(ref.current?.getCanvas()).toBeInstanceOf(HTMLCanvasElement);
     });
   });
 
@@ -179,6 +194,38 @@ describe('HalftoneCMYK component', () => {
       render(<HalftoneCMYKCanvas src="test.png" />);
       // 4 channels × 1 circle each = 4 arc calls
       expect(mockCtx.arc).toHaveBeenCalledTimes(4);
+    });
+
+    it('draws squares with rect for each channel', () => {
+      render(<HalftoneCMYKCanvas src="test.png" shape="square" cornerRadius={0} />);
+      expect(mockCtx.rect).toHaveBeenCalledTimes(4);
+      expect(mockCtx.rect).toHaveBeenCalledWith(5, 5, 10, 10);
+      expect(mockCtx.arc).not.toHaveBeenCalled();
+    });
+
+    it('draws rounded squares with roundRect for each channel', () => {
+      render(<HalftoneCMYKCanvas src="test.png" shape="square" cornerRadius={50} />);
+      expect(mockCtx.roundRect).toHaveBeenCalledTimes(4);
+      expect(mockCtx.roundRect).toHaveBeenCalledWith(5, 5, 10, 10, 2.5);
+    });
+
+    // The canvas path used to read shape/cornerRadius raw; the core clamps and
+    // whitelists them, so both must agree on bad input.
+    it('clamps an out-of-range cornerRadius to 100', () => {
+      render(<HalftoneCMYKCanvas src="test.png" shape="square" cornerRadius={500} />);
+      expect(mockCtx.roundRect).toHaveBeenCalledWith(5, 5, 10, 10, 5);
+    });
+
+    it('treats NaN cornerRadius as 0 rather than passing NaN to roundRect', () => {
+      render(<HalftoneCMYKCanvas src="test.png" shape="square" cornerRadius={NaN} />);
+      expect(mockCtx.roundRect).not.toHaveBeenCalled();
+      expect(mockCtx.rect).toHaveBeenCalledWith(5, 5, 10, 10);
+    });
+
+    it('falls back to circles for an unknown shape', () => {
+      render(<HalftoneCMYKCanvas src="test.png" shape={'triangle' as any} />);
+      expect(mockCtx.arc).toHaveBeenCalledTimes(4);
+      expect(mockCtx.rect).not.toHaveBeenCalled();
     });
 
     it('resets composite operation after drawing', () => {

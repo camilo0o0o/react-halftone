@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { HalftoneProps } from './types';
 import { calculateDisplayDimensions } from './core';
 import { useHalftone } from './useHalftone';
@@ -19,14 +20,17 @@ export function Halftone({
   style,
   fallback,
   onError,
-}: HalftoneProps): JSX.Element | null {
+}: HalftoneProps): ReactElement | null {
   const { status, error, pathData, naturalWidth, naturalHeight } =
     useHalftone(src, { step, density, color, invert, shape, cornerRadius, stepBasis, crossOrigin });
 
   useOnError(status, error, onError);
 
-  if (status !== 'ready' || !pathData || naturalWidth === null || naturalHeight === null) {
-    return (resolveFallback(fallback, status, error) as JSX.Element | null) ?? null;
+  // Gate on the result, not the status: during a config recompute the hook
+  // retains the previous result, so the svg stays mounted (no flicker). An
+  // empty-string pathData is a real result (a blank image) and still mounts.
+  if (pathData === null || naturalWidth === null || naturalHeight === null) {
+    return (resolveFallback(fallback, status, error) as ReactElement | null) ?? null;
   }
 
   const dims = calculateDisplayDimensions(naturalWidth, naturalHeight, propWidth, propHeight);

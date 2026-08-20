@@ -1,7 +1,7 @@
 import { forwardRef, useRef, useEffect, useCallback } from 'react';
 import type { ReactElement } from 'react';
 import type { HalftoneProps } from './types';
-import { calculateDisplayDimensions } from './core';
+import { calculateDisplayDimensions, validateConfig } from './core';
 import { useHalftone } from './useHalftone';
 import { resolveFallback, useOnError } from './fallback';
 
@@ -45,20 +45,26 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
 
     useOnError(status, error, onError);
 
-    const fillColor = color ?? '#000000';
+    // Run the draw-only props through the same validation the SVG path gets,
+    // so both renderers clamp and fall back identically. Destructured to
+    // primitives to keep the draw effect's deps stable.
+    const {
+      color: fillColor,
+      shape: dotShape,
+      cornerRadius: cr,
+    } = validateConfig({ color, shape, cornerRadius });
 
     useEffect(() => {
       const canvas = canvasRef.current;
-      if (!canvas || !circles || circles.length === 0) return;
+      // An empty circles array is a real result (a blank image) — still clear,
+      // or a previous frame's dots would stay painted.
+      if (!canvas || !circles) return;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = fillColor;
-
-      const dotShape = shape ?? 'circle';
-      const cr = cornerRadius ?? 0;
 
       if (dotShape === 'circle') {
         ctx.beginPath();
@@ -80,9 +86,12 @@ export const HalftoneCanvas = forwardRef<HTMLCanvasElement, HalftoneProps>(
           ctx.fill();
         }
       }
-    }, [circles, fillColor, shape, cornerRadius]);
+    }, [circles, fillColor, dotShape, cr]);
 
-    if (status !== 'ready' || !circles || circles.length === 0 || naturalWidth === null || naturalHeight === null) {
+    // Gate on the result, not the status: during a config recompute the hook
+    // retains the previous result, so the canvas stays mounted (no flicker,
+    // and forwarded refs stay valid).
+    if (circles === null || naturalWidth === null || naturalHeight === null) {
       return (resolveFallback(fallback, status, error) as ReactElement | null) ?? null;
     }
 

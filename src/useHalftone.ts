@@ -24,7 +24,9 @@ export function useHalftone(
   src: string,
   config: Partial<HalftoneConfig> & { crossOrigin?: string | null } = {}
 ): UseHalftoneResult {
-  const crossOrigin = config.crossOrigin ?? 'anonymous';
+  // `??` would swallow an explicit null, which is the documented way to opt
+  // out of the crossorigin attribute entirely.
+  const crossOrigin = config.crossOrigin === undefined ? 'anonymous' : config.crossOrigin;
   const [state, setState] = useState<State>(IDLE_STATE);
   const loadedRef = useRef<LoadedImage | null>(null);
   const pixelCacheRef = useRef<ExtractedPixels | null>(null);
@@ -43,7 +45,10 @@ export function useHalftone(
     let cancelled = false;
     loadedRef.current = null;
     pixelCacheRef.current = null;
-    setState((prev) => ({ status: 'loading', error: null, result: prev.result }));
+    // Drop the old result: it belongs to the previous src, so keeping it on
+    // screen would show the wrong image. Retention is only for same-src
+    // recomputes (effect B).
+    setState({ status: 'loading', error: null, result: null });
 
     const image = loadImageElement(
       src,

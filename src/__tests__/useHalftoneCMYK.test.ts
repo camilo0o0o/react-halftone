@@ -187,6 +187,23 @@ describe('useHalftoneCMYK', () => {
     });
   });
 
+  describe('crossOrigin', () => {
+    it('defaults to anonymous', () => {
+      renderHook(() => useHalftoneCMYK('test.png'));
+      expect(mockImageInstances[0].crossOrigin).toBe('anonymous');
+    });
+
+    it('null opts out of the attribute entirely', () => {
+      renderHook(() => useHalftoneCMYK('test.png', { crossOrigin: null }));
+      expect(mockImageInstances[0].crossOrigin).toBe('');
+    });
+
+    it('passes an explicit value through', () => {
+      renderHook(() => useHalftoneCMYK('test.png', { crossOrigin: 'use-credentials' }));
+      expect(mockImageInstances[0].crossOrigin).toBe('use-credentials');
+    });
+  });
+
   describe('dependency changes', () => {
     it('changing src triggers a new image load', () => {
       const { result, rerender } = renderHook(
@@ -199,6 +216,13 @@ describe('useHalftoneCMYK', () => {
       rerender({ src: 'second.png' });
       expect(result.current.status).toBe('loading');
       expect(mockImageInstances).toHaveLength(2);
+
+      // The first image's result must not linger while the second loads —
+      // it would render the old image under the new src.
+      expect(result.current.channels).toBeNull();
+      expect(result.current.naturalWidth).toBeNull();
+      expect(result.current.naturalHeight).toBeNull();
+      expect(result.current.totalCircleCount).toBe(0);
 
       triggerImageLoad(1);
       expect(result.current.status).toBe('ready');
