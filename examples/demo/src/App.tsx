@@ -25,9 +25,32 @@ import { UploadButton } from './components/UploadButton';
 type Mode = 'mono' | 'cmyk';
 type Renderer = 'canvas' | 'svg';
 type StepBasis = 'min' | 'width';
-type PreviewBg = 'light' | 'dark' | 'checker';
+/** `custom` is whatever the background colour picker last produced. */
+type PreviewBg = 'light' | 'dark' | 'checker' | 'custom';
+/** Shape, plus the escape hatch that shows the source image untouched. */
+type DisplayMode = ShapeType | 'original';
 
 const COLOR_PRESETS = ['#000000', '#ffffff', '#e63946', '#1d4ed8', '#f77f00'];
+
+const DEFAULTS = {
+  imageSrc: '/sample.jpeg',
+  mode: 'cmyk',
+  step: 5,
+  density: 80,
+  displayMode: 'circle',
+  cornerRadius: 0,
+  stepBasis: 'min',
+  renderer: 'canvas',
+  color: '#000000',
+  invert: false,
+  showStats: true,
+  previewBg: 'light',
+  customBg: '#d9d9d9',
+  angleC: 15,
+  angleM: 75,
+  angleY: 0,
+  angleK: 45,
+} as const;
 
 const MODE_OPTIONS: { value: Mode; label: string }[] = [
   { value: 'mono', label: 'Monochrome' },
@@ -44,11 +67,14 @@ const STEP_BASIS_OPTIONS: { value: StepBasis; label: string }[] = [
   { value: 'width', label: 'Width' },
 ];
 
-const SHAPE_OPTIONS: { value: ShapeType; label: string }[] = [
+const SHAPE_OPTIONS: { value: DisplayMode; label: string }[] = [
   { value: 'circle', label: 'Circle' },
   { value: 'square', label: 'Square' },
+  { value: 'original', label: 'Original' },
 ];
 
+// No `custom` entry: picking a colour selects that state, and none of these
+// three staying lit is exactly the right signal that a custom fill is active.
 const PREVIEW_BG_OPTIONS: { value: PreviewBg; label: string }[] = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -150,32 +176,38 @@ export function App() {
   const cmykRef = useRef<HalftoneCMYKHandle>(null);
 
   // Image source
-  const [imageSrc, setImageSrc] = useState('/sample.jpeg');
+  const [imageSrc, setImageSrc] = useState<string>(DEFAULTS.imageSrc);
 
   // Mode
-  const [mode, setMode] = useState<Mode>('cmyk');
+  const [mode, setMode] = useState<Mode>(DEFAULTS.mode);
 
   // Shared controls
-  const [step, setStep] = useState(5);
-  const [density, setDensity] = useState(80);
-  const [shape, setShape] = useState<ShapeType>('circle');
-  const [cornerRadius, setCornerRadius] = useState(0);
-  const [stepBasis, setStepBasis] = useState<StepBasis>('min');
+  const [step, setStep] = useState<number>(DEFAULTS.step);
+  const [density, setDensity] = useState<number>(DEFAULTS.density);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(DEFAULTS.displayMode);
+  const [cornerRadius, setCornerRadius] = useState<number>(DEFAULTS.cornerRadius);
+  const [stepBasis, setStepBasis] = useState<StepBasis>(DEFAULTS.stepBasis);
 
   // Mono controls
-  const [renderer, setRenderer] = useState<Renderer>('canvas');
-  const [color, setColor] = useState('#000000');
-  const [invert, setInvert] = useState(false);
-  const [showStats, setShowStats] = useState(true);
+  const [renderer, setRenderer] = useState<Renderer>(DEFAULTS.renderer);
+  const [color, setColor] = useState<string>(DEFAULTS.color);
+  const [invert, setInvert] = useState<boolean>(DEFAULTS.invert);
+  const [showStats, setShowStats] = useState<boolean>(DEFAULTS.showStats);
 
   // Preview pane
-  const [previewBg, setPreviewBg] = useState<PreviewBg>('light');
+  const [previewBg, setPreviewBg] = useState<PreviewBg>(DEFAULTS.previewBg);
+  const [customBg, setCustomBg] = useState<string>(DEFAULTS.customBg);
 
   // CMYK angles
-  const [angleC, setAngleC] = useState(15);
-  const [angleM, setAngleM] = useState(75);
-  const [angleY, setAngleY] = useState(0);
-  const [angleK, setAngleK] = useState(45);
+  const [angleC, setAngleC] = useState<number>(DEFAULTS.angleC);
+  const [angleM, setAngleM] = useState<number>(DEFAULTS.angleM);
+  const [angleY, setAngleY] = useState<number>(DEFAULTS.angleY);
+  const [angleK, setAngleK] = useState<number>(DEFAULTS.angleK);
+
+  // `original` isn't a shape the core knows about — it only decides whether
+  // the preview shows the halftone at all, so the halftone config keeps the
+  // last real shape's neighbour, circle.
+  const shape: ShapeType = displayMode === 'original' ? 'circle' : displayMode;
 
   // Step is shared by the slider and the exact-value number input; clamp to the
   // range the core accepts (min matches the core's MIN_STEP of 0.1).
@@ -184,8 +216,42 @@ export function App() {
     setStep(Math.min(10, Math.max(0.1, value)));
   }
 
+  // Uploads hand out object URLs that stay alive until revoked, so every
+  // replacement of one has to release it first.
+  function replaceImageSrc(next: string) {
+    setImageSrc((current) => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current);
+      return next;
+    });
+  }
+
   function handleFileUpload(file: File) {
-    setImageSrc(URL.createObjectURL(file));
+    replaceImageSrc(URL.createObjectURL(file));
+  }
+
+  function handleReset() {
+    replaceImageSrc(DEFAULTS.imageSrc);
+    setMode(DEFAULTS.mode);
+    setStep(DEFAULTS.step);
+    setDensity(DEFAULTS.density);
+    setDisplayMode(DEFAULTS.displayMode);
+    setCornerRadius(DEFAULTS.cornerRadius);
+    setStepBasis(DEFAULTS.stepBasis);
+    setRenderer(DEFAULTS.renderer);
+    setColor(DEFAULTS.color);
+    setInvert(DEFAULTS.invert);
+    setShowStats(DEFAULTS.showStats);
+    setPreviewBg(DEFAULTS.previewBg);
+    setCustomBg(DEFAULTS.customBg);
+    setAngleC(DEFAULTS.angleC);
+    setAngleM(DEFAULTS.angleM);
+    setAngleY(DEFAULTS.angleY);
+    setAngleK(DEFAULTS.angleK);
+  }
+
+  function handleCustomBg(value: string) {
+    setCustomBg(value);
+    setPreviewBg('custom');
   }
 
   function handleExport() {
@@ -236,6 +302,10 @@ export function App() {
       <div className="sidebar">
         <header className="sidebar-header">
           <h1 className="app-title">react-halftone</h1>
+          {/* Per-section cards leave no single "Controls" header for this to
+              sit in, the way the style reference has it — the sidebar's own
+              header row plays that part instead. */}
+          <Button onClick={handleReset}>Reset</Button>
         </header>
 
         <SegmentedControl value={mode} options={MODE_OPTIONS} onChange={setMode} />
@@ -318,8 +388,12 @@ export function App() {
         </Card>
 
         <Card title="Shape">
-          <SegmentedControl value={shape} options={SHAPE_OPTIONS} onChange={setShape} />
-          {shape === 'square' && (
+          <SegmentedControl
+            value={displayMode}
+            options={SHAPE_OPTIONS}
+            onChange={setDisplayMode}
+          />
+          {displayMode === 'square' && (
             <Slider
               label="Corner radius"
               value={cornerRadius}
@@ -386,6 +460,17 @@ export function App() {
             options={PREVIEW_BG_OPTIONS}
             onChange={setPreviewBg}
           />
+          <div className="color-row">
+            <input
+              type="color"
+              value={customBg}
+              aria-label="Custom background colour"
+              onChange={(e) => handleCustomBg(e.target.value)}
+            />
+            <span className="control-value">
+              {previewBg === 'custom' ? customBg : 'Pick a custom background'}
+            </span>
+          </div>
           <Checkbox label="Show dot count" checked={showStats} onChange={setShowStats} />
         </Card>
       </div>
@@ -394,8 +479,13 @@ export function App() {
         {/* Framed in CSS on purpose: the library components keep rendering
             their own canvas/svg, so the renderer toggle still exercises both
             paths. The frame is never part of what they draw. */}
-        <div className={`preview-frame bg-${previewBg}`}>
-          {mode === 'mono' ? (
+        <div
+          className={`preview-frame bg-${previewBg}`}
+          style={previewBg === 'custom' ? { background: customBg } : undefined}
+        >
+          {displayMode === 'original' ? (
+            <img src={imageSrc} alt="Source image, unprocessed" />
+          ) : mode === 'mono' ? (
             renderer === 'svg' ? (
               <Halftone {...monoProps} />
             ) : (
