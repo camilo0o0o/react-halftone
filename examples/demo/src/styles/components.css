@@ -161,6 +161,13 @@ input[type='checkbox']:focus-visible {
   opacity: 0.8;
 }
 
+/* An export in flight: dimmed and inert, but still holding its space so the
+   card doesn't reflow mid-click. */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .btn-ink {
   background: var(--ink);
   color: var(--surface);

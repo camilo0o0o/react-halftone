@@ -7,14 +7,22 @@ interface ButtonProps {
   variant?: 'ink' | 'accent';
   /** Stretches the button across the card. */
   block?: boolean;
+  disabled?: boolean;
 }
 
-export function Button({ children, onClick, variant = 'ink', block }: ButtonProps) {
+export function Button({
+  children,
+  onClick,
+  variant = 'ink',
+  block,
+  disabled,
+}: ButtonProps) {
   return (
     <button
       type="button"
       className={`btn btn-${variant}${block ? ' btn-block' : ''}`}
       onClick={onClick}
+      disabled={disabled}
     >
       {children}
     </button>

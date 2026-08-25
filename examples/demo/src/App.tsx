@@ -21,6 +21,7 @@ import { SegmentedControl } from './components/SegmentedControl';
 import { Slider } from './components/Slider';
 import { SwatchRow } from './components/SwatchRow';
 import { UploadButton } from './components/UploadButton';
+import { buildMonoSVG, downloadText, downloadURL, svgToPNG } from './export';
 
 type Mode = 'mono' | 'cmyk';
 type Renderer = 'canvas' | 'svg';
@@ -174,6 +175,7 @@ function CmykStats({ src, ...config }: CmykStatsProps) {
 
 export function App() {
   const cmykRef = useRef<HalftoneCMYKHandle>(null);
+  const monoCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Image source
   const [imageSrc, setImageSrc] = useState<string>(DEFAULTS.imageSrc);
@@ -197,6 +199,10 @@ export function App() {
   // Preview pane
   const [previewBg, setPreviewBg] = useState<PreviewBg>(DEFAULTS.previewBg);
   const [customBg, setCustomBg] = useState<string>(DEFAULTS.customBg);
+
+  // Export
+  const [exportNote, setExportNote] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<boolean>(false);
 
   // CMYK angles
   const [angleC, setAngleC] = useState<number>(DEFAULTS.angleC);
@@ -254,13 +260,47 @@ export function App() {
     setPreviewBg('custom');
   }
 
-  function handleExport() {
+  function handleExportCMYK() {
     if (!cmykRef.current) return;
-    const dataUrl = cmykRef.current.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = 'halftone-cmyk.png';
-    link.href = dataUrl;
-    link.click();
+    downloadURL('halftone-cmyk.png', cmykRef.current.toDataURL('image/png'));
+  }
+
+  // The mono exports recompute from the source pixels rather than reading the
+  // preview, so they come out at the image's natural resolution regardless of
+  // the 700px the preview is displayed at.
+  async function runMonoExport(work: () => Promise<void>) {
+    setExporting(true);
+    setExportNote('Rendering export…');
+    try {
+      await work();
+      setExportNote(null);
+    } catch (error) {
+      setExportNote(error instanceof Error ? error.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleExportMonoSVG() {
+    void runMonoExport(async () => {
+      const { svg } = await buildMonoSVG(imageSrc, monoConfig);
+      downloadText('halftone-mono.svg', svg, 'image/svg+xml');
+    });
+  }
+
+  function handleExportMonoPNG() {
+    void runMonoExport(async () => {
+      // In canvas mode the pixels are already on screen — the forwarded ref is
+      // the whole export. The SVG renderer has no canvas to read, so that path
+      // rasterizes the same standalone SVG the SVG button downloads.
+      const canvas = monoCanvasRef.current;
+      if (canvas) {
+        downloadURL('halftone-mono.png', canvas.toDataURL('image/png'));
+        return;
+      }
+      const { svg, width, height } = await buildMonoSVG(imageSrc, monoConfig);
+      downloadURL('halftone-mono.png', await svgToPNG(svg, width, height));
+    });
   }
 
   const previewFallback: HalftoneFallback = (status) =>
@@ -284,15 +324,13 @@ export function App() {
     { channel: 'k', label: 'Black (K)', value: angleK, onChange: setAngleK },
   ];
 
+  // Shared by the preview and the exports so a download can never disagree
+  // with what's on screen.
+  const monoConfig = { step, density, color, invert, shape, cornerRadius, stepBasis };
+
   const monoProps = {
+    ...monoConfig,
     src: imageSrc,
-    step,
-    density,
-    color,
-    invert,
-    shape,
-    cornerRadius,
-    stepBasis,
     width: 700,
     fallback: previewFallback,
   };
@@ -447,11 +485,40 @@ export function App() {
                 />
               </div>
             ))}
-            <Button variant="accent" block onClick={handleExport}>
-              Export PNG
-            </Button>
           </Card>
         )}
+
+        <Card title="Export">
+          {mode === 'mono' ? (
+            <>
+              <Button
+                variant="accent"
+                block
+                disabled={exporting || displayMode === 'original'}
+                onClick={handleExportMonoPNG}
+              >
+                Export PNG
+              </Button>
+              <Button
+                block
+                disabled={exporting || displayMode === 'original'}
+                onClick={handleExportMonoSVG}
+              >
+                Export SVG
+              </Button>
+            </>
+          ) : (
+            <Button variant="accent" block onClick={handleExportCMYK}>
+              Export PNG
+            </Button>
+          )}
+          {/* An export always matches the preview — and in `original` there is
+              no halftone on screen to match. */}
+          {mode === 'mono' && displayMode === 'original' && (
+            <span className="control-value">Pick a shape to export a halftone.</span>
+          )}
+          {exportNote && <span className="control-value">{exportNote}</span>}
+        </Card>
 
         <Card title="Preview">
           <SegmentedControl
@@ -489,7 +556,7 @@ export function App() {
             renderer === 'svg' ? (
               <Halftone {...monoProps} />
             ) : (
-              <HalftoneCanvas {...monoProps} />
+              <HalftoneCanvas ref={monoCanvasRef} {...monoProps} />
             )
           ) : (
             <HalftoneCMYKCanvas

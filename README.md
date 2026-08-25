@@ -454,7 +454,7 @@ The hooks are built for smooth realtime interaction:
 
 ## Example app
 
-An interactive demo is included in [`examples/demo/`](./examples/demo/). It lets you toggle between monochrome and CMYK modes, adjust all parameters with sliders, upload custom images, and export the result as PNG.
+An interactive demo is included in [`examples/demo/`](./examples/demo/). It lets you toggle between monochrome and CMYK modes, adjust all parameters with sliders, upload custom images, and export the result — CMYK as PNG, monochrome as either PNG or a standalone SVG (built with `renderHalftoneSVG` at the image's natural resolution).
 
 ```bash
 cd examples/demo
