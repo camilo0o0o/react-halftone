@@ -15,7 +15,7 @@ export interface HalftoneConfig {
   /** Grid spacing as percentage of smaller dimension (0.1-50) */
   step: number;
 
-  /** Maximum circle size as percentage (0-100) */
+  /** Maximum ink coverage of a grid cell as percentage (0-100); 100 lets full ink print solid */
   density: number;
 
   /** Fill color for circles (hex format) */
@@ -55,7 +55,10 @@ export interface GridConfig {
   /** Step size in pixels */
   stepPx: number;
 
-  /** Maximum circle radius */
+  /**
+   * Edge inset that centres the grid: half a cell at density 100. Not the
+   * largest dot — dots are sized by `createDotSizer` and can overflow their cell.
+   */
   maxRadius: number;
 
   /** Number of columns */
@@ -101,7 +104,7 @@ export interface CMYKChannelConfig {
   angle?: number;
   /** Grid spacing override */
   step?: number;
-  /** Max dot size override */
+  /** Max ink coverage override */
   density?: number;
 }
 
@@ -121,7 +124,7 @@ export interface CMYKChannelsConfig {
 export interface HalftoneCMYKConfig {
   /** Grid spacing percentage (0.1-50) — global default */
   step?: number;
-  /** Maximum dot size percentage (0-100) — global default */
+  /** Maximum ink coverage percentage (0-100) — global default */
   density?: number;
   /** Dot shape — global default */
   shape?: ShapeType;

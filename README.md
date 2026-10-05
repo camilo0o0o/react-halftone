@@ -235,7 +235,7 @@ Both components accept the same props:
 | `src` | `string` | **(required)** | Image source URL |
 | `color` | `string` | `"#000000"` | Fill color for circles (hex format) |
 | `step` | `number` | `10` | Grid spacing as % of the smaller image dimension (0.1–50). Lower = more circles. |
-| `density` | `number` | `80` | Max circle size as % of grid cell (0–100). Higher = larger circles. |
+| `density` | `number` | `100` | Max ink coverage as % of grid cell (0–100). At 100, full ink prints solid. |
 | `invert` | `boolean` | `false` | Invert brightness mapping — bright areas get large circles. Use for dark backgrounds. |
 | `shape` | `'circle' \| 'square'` | `"circle"` | Shape of halftone dots |
 | `cornerRadius` | `number` | `0` | Corner radius for squares as % of half-side (0–100). Ignored when shape is `"circle"`. |
@@ -259,7 +259,7 @@ Props are validated rather than trusted: numeric values are clamped to the range
 |------|------|---------|-------------|
 | `src` | `string` | **(required)** | Image source URL |
 | `step` | `number` | `10` | Grid spacing as % of the smaller image dimension (0.1–50) |
-| `density` | `number` | `80` | Max dot size as % of grid cell (0–100) |
+| `density` | `number` | `100` | Max ink coverage as % of grid cell (0–100) |
 | `shape` | `'circle' \| 'square'` | `"circle"` | Dot shape (global default for all channels) |
 | `cornerRadius` | `number` | `0` | Corner radius for squares (0–100) |
 | `stepBasis` | `'min' \| 'width'` | `'min'` | Dimension used for step calculation |
@@ -309,7 +309,7 @@ function useHalftone(src: string, config?: Partial<HalftoneConfig>): UseHalftone
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `step` | `number` | `10` | Grid spacing as % of smaller dimension (0.1–50) |
-| `density` | `number` | `80` | Max circle size as % of grid cell (0–100) |
+| `density` | `number` | `100` | Max ink coverage as % of grid cell (0–100) |
 | `color` | `string` | `"#000000"` | Fill color (hex format, validated internally) |
 | `invert` | `boolean` | `false` | Invert brightness mapping for dark backgrounds |
 | `shape` | `'circle' \| 'square'` | `"circle"` | Shape of halftone dots |
@@ -404,7 +404,7 @@ interface CMYK {
 
 interface HalftoneConfig {
   step: number;           // Grid spacing % (0.1–50)
-  density: number;        // Max circle size % (0–100)
+  density: number;        // Max ink coverage % (0–100)
   color: string;          // Hex color
   invert: boolean;        // Invert brightness mapping
   shape: ShapeType;       // Dot shape ('circle' or 'square')
@@ -415,7 +415,7 @@ interface HalftoneConfig {
 interface CMYKChannelConfig {
   angle?: number;         // Rotation angle in degrees
   step?: number;          // Grid spacing override
-  density?: number;       // Max dot size override
+  density?: number;       // Max ink coverage override
 }
 
 interface HalftoneCMYKHandle {
@@ -431,7 +431,7 @@ interface HalftoneCMYKHandle {
 
 1. Loads the image and draws it to an offscreen canvas
 2. Samples each grid point's pixel brightness (converted to greyscale using RGB average)
-3. Maps brightness to shape size — by default, darker pixels get bigger shapes; with `invert: true`, brighter pixels get bigger shapes. The only dots dropped are those whose computed radius is too small to see, so highlights fade out smoothly rather than banding at a brightness threshold; pure white produces no dots because its radius is zero
+3. Maps brightness to shape size — by default, darker pixels get bigger shapes; with `invert: true`, brighter pixels get bigger shapes. Shapes are sized by area, so the share of each grid cell they cover matches the tone (50% grey covers half the cell), and at full darkness they grow past the cell and merge into a solid. Every shape covers the same area for the same tone. The only dots dropped are those whose computed radius is too small to see, so highlights fade out smoothly rather than banding at a brightness threshold; pure white produces no dots because its radius is zero
 4. Generates SVG path commands based on the selected shape (circle arcs, square lines, or rounded-rect lines+arcs)
 5. `Halftone` renders all shapes as a single SVG `<path>` for performance; `HalftoneCanvas` draws to a `<canvas>` bitmap for lighter DOM weight
 
@@ -440,7 +440,7 @@ interface HalftoneCMYKHandle {
 1. Loads the image and extracts pixel data (single `getImageData` call shared across all channels)
 2. Converts each sampled pixel from RGB to CMYK using Grey Component Replacement (GCR) — the common dark component is extracted as the K (black) channel, producing cleaner darks than overlapping CMY
 3. For each channel, generates a dot grid rotated to that channel's screen angle. Default angles (C=15°, M=75°, Y=0°, K=45°) are spaced 30° apart for the three most visible inks to create pleasing rosette patterns instead of moire interference
-4. Each channel's dot sizes are proportional to its CMYK intensity at that grid point — higher ink values produce larger dots
+4. Each channel's dot area is proportional to its CMYK intensity at that grid point — a dot covers the same share of its grid cell as the ink value, so 100% ink prints solid
 5. The four channel layers are composited onto a white canvas using `globalCompositeOperation: 'multiply'`, simulating how transparent inks layer in print
 
 ### Performance

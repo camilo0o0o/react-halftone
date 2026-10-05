@@ -46,7 +46,7 @@ export interface HalftoneProps {
   /** Grid spacing percentage (0.1-50) */
   step?: number;
 
-  /** Maximum circle size percentage (0-100) */
+  /** Maximum ink coverage percentage (0-100); 100 lets full ink print solid */
   density?: number;
 
   /** Invert brightness mapping (for dark backgrounds) */
@@ -106,7 +106,7 @@ export interface HalftoneCMYKProps {
   src: string;
   /** Grid spacing percentage (0.1-50) — global default */
   step?: number;
-  /** Maximum dot size percentage (0-100) — global default */
+  /** Maximum ink coverage percentage (0-100) — global default */
   density?: number;
   /** Dot shape — global default (applies to every channel) */
   shape?: ShapeType;

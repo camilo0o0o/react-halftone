@@ -9,6 +9,7 @@
 export * from './types';
 export * from './color';
 export * from './halftone';
+export * from './dot';
 export * from './svg';
 
 import type {
@@ -18,6 +19,7 @@ import type {
   HalftoneCMYKResult,
   CMYKChannel,
   CMYKChannelResult,
+  ShapeType,
 } from './types';
 import {
   validateConfig,
@@ -31,6 +33,7 @@ import {
   CMYK_CHANNELS,
 } from './halftone';
 import type { ValidatedCMYKChannelConfig } from './halftone';
+import { createDotSizer } from './dot';
 import { generatePathData } from './svg';
 
 /**
@@ -57,7 +60,10 @@ export function computeHalftone(
     return { circles: [], pathData: '' };
   }
 
-  const rawCircles = generateCircles(pixels, width, height, grid, validated.invert, scale);
+  const dotSize = createDotSizer(
+    grid.stepPx, validated.density, validated.shape, validated.cornerRadius
+  );
+  const rawCircles = generateCircles(pixels, width, height, grid, dotSize, validated.invert, scale);
   const circles = scaleCircles(rawCircles, scale);
   const pathData = generatePathData(circles, validated.shape, validated.cornerRadius);
 
@@ -79,6 +85,9 @@ export function computeHalftone(
  * @param channel   Which ink to separate.
  * @param chConfig  Already-validated angle/step/density for this channel.
  * @param stepBasis Dimension the step percentage is measured against.
+ * @param shape     Dot shape. Dots are sized so each shape covers the same
+ *                  area for the same ink, so the shape changes the sizes.
+ * @param cornerRadius Corner radius percentage for square dots.
  */
 export function computeHalftoneCMYKChannel(
   pixels: Uint8ClampedArray,
@@ -87,14 +96,17 @@ export function computeHalftoneCMYKChannel(
   scale: number,
   channel: CMYKChannel,
   chConfig: ValidatedCMYKChannelConfig,
-  stepBasis: 'min' | 'width'
+  stepBasis: 'min' | 'width',
+  shape: ShapeType,
+  cornerRadius: number
 ): CMYKChannelResult {
-  const { stepPx, maxRadius } = calculateGrid(
+  const { stepPx } = calculateGrid(
     width, height, chConfig.step, chConfig.density, stepBasis
   );
   const gridPoints = generateRotatedGridPoints(width, height, stepPx, chConfig.angle);
+  const dotSize = createDotSizer(stepPx, chConfig.density, shape, cornerRadius);
   const rawCircles = generateChannelCircles(
-    pixels, width, height, gridPoints, maxRadius, channel, scale
+    pixels, width, height, gridPoints, dotSize, channel, scale
   );
 
   return {
@@ -126,7 +138,8 @@ export function computeHalftoneCMYK(
 
   for (const ch of CMYK_CHANNELS) {
     channels[ch] = computeHalftoneCMYKChannel(
-      pixels, width, height, scale, ch, validated.channels[ch], validated.stepBasis
+      pixels, width, height, scale, ch, validated.channels[ch], validated.stepBasis,
+      validated.shape, validated.cornerRadius
     );
   }
 

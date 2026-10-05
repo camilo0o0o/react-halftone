@@ -206,9 +206,9 @@ describe('useHalftoneCMYK', () => {
     });
   });
 
-  // computeHalftoneCMYK returns circle data only — shape and cornerRadius are
-  // applied by the canvas at draw time, so they must not recompute all four
-  // channels.
+  // Dots are sized so every shape covers the same area for the same ink, so
+  // shape and cornerRadius feed the dot sizes — but only when the change can
+  // actually alter them.
   describe('recompute triggers', () => {
     function channelsComputed() {
       return vi.mocked(computeHalftoneCMYKChannel).mock.calls.map((c) => c[4]);
@@ -217,7 +217,7 @@ describe('useHalftoneCMYK', () => {
       return vi.mocked(computeHalftoneCMYKChannel).mock.calls.length;
     }
 
-    it('does not recompute when only shape changes', () => {
+    it('recomputes every channel when shape changes', () => {
       const { rerender } = renderHook(
         ({ shape }: { shape: 'circle' | 'square' }) => useHalftoneCMYK('test.png', { shape }),
         { initialProps: { shape: 'circle' as 'circle' | 'square' } }
@@ -226,12 +226,24 @@ describe('useHalftoneCMYK', () => {
 
       const before = computeCalls();
       rerender({ shape: 'square' as const });
-      expect(computeCalls()).toBe(before);
+      expect(computeCalls()).toBe(before + 4);
     });
 
-    it('does not recompute when only cornerRadius changes', () => {
+    it('recomputes every channel when a square\'s cornerRadius changes', () => {
       const { rerender } = renderHook(
         ({ cornerRadius }) => useHalftoneCMYK('test.png', { shape: 'square', cornerRadius }),
+        { initialProps: { cornerRadius: 0 } }
+      );
+      triggerImageLoad(0);
+
+      const before = computeCalls();
+      rerender({ cornerRadius: 50 });
+      expect(computeCalls()).toBe(before + 4);
+    });
+
+    it('does not recompute when cornerRadius changes on circles', () => {
+      const { rerender } = renderHook(
+        ({ cornerRadius }) => useHalftoneCMYK('test.png', { shape: 'circle', cornerRadius }),
         { initialProps: { cornerRadius: 0 } }
       );
       triggerImageLoad(0);

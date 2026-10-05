@@ -37,7 +37,7 @@ const DEFAULTS = {
   imageSrc: '/sample.jpeg',
   mode: 'cmyk',
   step: 5,
-  density: 80,
+  density: 100,
   displayMode: 'circle',
   cornerRadius: 0,
   stepBasis: 'min',
