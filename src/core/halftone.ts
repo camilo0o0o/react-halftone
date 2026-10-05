@@ -8,11 +8,12 @@ import type {
   HalftoneCMYKConfig,
 } from './types';
 import { rgbToCmyk } from './color';
+import type { DotSizer } from './dot';
 
 // Dots below this final (natural-space) radius are culled. Kept small so faint
 // channels/tones render as light antialiased specks rather than being dropped;
-// it only removes truly imperceptible sub-~12%-ink dots (a perf/noise floor, not
-// a 1px-diameter aesthetic floor). radius 0 is still skipped (no empty dots).
+// it only removes truly imperceptible dots (a perf/noise floor, not a
+// 1px-diameter aesthetic floor). radius 0 is still skipped (no empty dots).
 const MIN_RADIUS = 0.1;
 const MIN_STEP = 0.1;
 const MAX_STEP = 50;
@@ -37,7 +38,7 @@ export function validateConfig(config: Partial<HalftoneConfig>): HalftoneConfig 
     : 'circle';
   return {
     step: clamp(config.step ?? 10, MIN_STEP, MAX_STEP),
-    density: clamp(config.density ?? 80, MIN_DENSITY, MAX_DENSITY),
+    density: clamp(config.density ?? 100, MIN_DENSITY, MAX_DENSITY),
     color: isValidHexColor(config.color ?? '') ? config.color! : '#000000',
     invert: config.invert ?? false,
     shape,
@@ -116,6 +117,7 @@ export function generateCircles(
   imageWidth: number,
   imageHeight: number,
   grid: GridConfig,
+  dotSize: DotSizer,
   invert: boolean = false,
   scale: number = 1
 ): Circle[] {
@@ -130,7 +132,7 @@ export function generateCircles(
       const greyscale = toGreyscale(pixel.r, pixel.g, pixel.b);
       const brightness = greyscale / 255;
       const factor = invert ? brightness : 1 - brightness;
-      const radius = grid.maxRadius * factor;
+      const radius = dotSize(factor);
 
       // The computed radius is the only cull. Filtering on the source value
       // instead would band highlights at a hard threshold, and filtering in
@@ -210,7 +212,7 @@ export interface ValidatedCMYKConfig {
 
 export function validateCMYKConfig(config: Partial<HalftoneCMYKConfig>): ValidatedCMYKConfig {
   const globalStep = clamp(config.step ?? 10, MIN_STEP, MAX_STEP);
-  const globalDensity = clamp(config.density ?? 80, MIN_DENSITY, MAX_DENSITY);
+  const globalDensity = clamp(config.density ?? 100, MIN_DENSITY, MAX_DENSITY);
   const shape = VALID_SHAPES.includes(config.shape as ShapeType)
     ? (config.shape as ShapeType)
     : 'circle';
@@ -279,7 +281,7 @@ export function generateChannelCircles(
   imageWidth: number,
   imageHeight: number,
   gridPoints: Array<{ x: number; y: number }>,
-  maxRadius: number,
+  dotSize: DotSizer,
   channel: CMYKChannel,
   scale: number = 1
 ): Circle[] {
@@ -288,7 +290,7 @@ export function generateChannelCircles(
   for (const pt of gridPoints) {
     const pixel = samplePixelFromBuffer(pixels, pt.x, pt.y, imageWidth, imageHeight);
     const cmyk = rgbToCmyk(pixel.r, pixel.g, pixel.b);
-    const radius = maxRadius * cmyk[channel];
+    const radius = dotSize(cmyk[channel]);
 
     // The computed radius is the only cull. Filtering on the source value
     // instead would band highlights at a hard threshold, and filtering in

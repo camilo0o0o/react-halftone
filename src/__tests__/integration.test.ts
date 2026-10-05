@@ -5,6 +5,7 @@ import {
   generateCircles,
   calculateGrid,
   computeHalftone,
+  createDotSizer,
 } from '../core';
 
 function pixelsFor(width: number, height: number, paint: (ctx: any) => void) {
@@ -56,19 +57,22 @@ describe('samplePixelFromBuffer', () => {
 });
 
 describe('generateCircles', () => {
-  it('solid black canvas → circles at max radius', () => {
+  // 100x100 at step 10% → stepPx 10
+  const dotSize = createDotSizer(10, 100, 'circle', 0);
+
+  it('solid black canvas → solid circles (half the cell diagonal)', () => {
     const { ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#000000';
     (ctx as any).fillRect(0, 0, 100, 100);
     const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
-    const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(pixels, 100, 100, grid);
+    const grid = calculateGrid(100, 100, 10, 100);
+    const circles = generateCircles(pixels, 100, 100, grid, dotSize);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
-      // All circles should be near max radius (darkness = 1)
-      expect(c.r).toBeCloseTo(grid.maxRadius, 1);
+      // Darkness 1 at density 100 → the cell is fully covered
+      expect(c.r).toBeCloseTo(grid.stepPx * Math.SQRT1_2, 1);
     }
   });
 
@@ -78,8 +82,8 @@ describe('generateCircles', () => {
     (ctx as any).fillRect(0, 0, 100, 100);
     const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
-    const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(pixels, 100, 100, grid);
+    const grid = calculateGrid(100, 100, 10, 100);
+    const circles = generateCircles(pixels, 100, 100, grid, dotSize);
 
     expect(circles.length).toBe(0);
   });
@@ -93,8 +97,8 @@ describe('generateCircles', () => {
     (ctx as any).fillRect(50, 0, 50, 100);
     const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
-    const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(pixels, 100, 100, grid);
+    const grid = calculateGrid(100, 100, 10, 100);
+    const circles = generateCircles(pixels, 100, 100, grid, dotSize);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
@@ -103,19 +107,19 @@ describe('generateCircles', () => {
     }
   });
 
-  it('solid white canvas with invert=true → circles at max radius', () => {
+  it('solid white canvas with invert=true → solid circles', () => {
     const { ctx } = makeCanvasCtx(100, 100);
     (ctx as any).fillStyle = '#ffffff';
     (ctx as any).fillRect(0, 0, 100, 100);
     const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
-    const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(pixels, 100, 100, grid, true);
+    const grid = calculateGrid(100, 100, 10, 100);
+    const circles = generateCircles(pixels, 100, 100, grid, dotSize, true);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {
-      // With invert, white (brightness=1) → factor=1 → max radius
-      expect(c.r).toBeCloseTo(grid.maxRadius, 1);
+      // With invert, white (brightness=1) → factor=1 → fully covered cell
+      expect(c.r).toBeCloseTo(grid.stepPx * Math.SQRT1_2, 1);
     }
   });
 
@@ -125,8 +129,8 @@ describe('generateCircles', () => {
     (ctx as any).fillRect(0, 0, 100, 100);
     const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
-    const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(pixels, 100, 100, grid, true);
+    const grid = calculateGrid(100, 100, 10, 100);
+    const circles = generateCircles(pixels, 100, 100, grid, dotSize, true);
 
     // With invert, black (brightness=0) → factor=0 → radius below MIN_RADIUS
     expect(circles.length).toBe(0);
@@ -141,8 +145,8 @@ describe('generateCircles', () => {
     (ctx as any).fillRect(50, 0, 50, 100);
     const pixels = (ctx as any).getImageData(0, 0, 100, 100).data;
 
-    const grid = calculateGrid(100, 100, 10, 80);
-    const circles = generateCircles(pixels, 100, 100, grid, true);
+    const grid = calculateGrid(100, 100, 10, 100);
+    const circles = generateCircles(pixels, 100, 100, grid, dotSize, true);
 
     expect(circles.length).toBeGreaterThan(0);
     for (const c of circles) {

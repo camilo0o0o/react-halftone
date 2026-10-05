@@ -10,6 +10,7 @@ import {
   calculateGrid,
   computeDownsampleScale,
   computeHalftoneCMYKChannel,
+  dotRoundness,
   CMYK_CHANNELS,
 } from './core';
 import { useHalftoneEngine } from './useHalftoneEngine';
@@ -25,12 +26,17 @@ interface ChannelCacheEntry {
   result: CMYKChannelResult;
 }
 
-/** Everything a channel's dots depend on, beyond the pixel buffer itself. */
+/**
+ * Everything a channel's dots depend on, beyond the pixel buffer itself. Shape
+ * enters as its roundness, so a corner-radius change while drawing circles
+ * (which can't affect their sizes) keeps the cache.
+ */
 function channelKey(
   chConfig: { angle: number; step: number; density: number },
-  stepBasis: string
+  stepBasis: string,
+  roundness: number
 ): string {
-  return `${chConfig.angle}|${chConfig.step}|${chConfig.density}|${stepBasis}`;
+  return `${chConfig.angle}|${chConfig.step}|${chConfig.density}|${stepBasis}|${roundness}`;
 }
 
 export function useHalftoneCMYK(
@@ -67,9 +73,10 @@ export function useHalftoneCMYK(
         cachedPixelsRef.current = cache.pixels;
       }
 
+      const roundness = dotRoundness(validated.shape, validated.cornerRadius);
       const channels = {} as Record<CMYKChannel, CMYKChannelResult>;
       for (const ch of CMYK_CHANNELS) {
-        const key = channelKey(validated.channels[ch], validated.stepBasis);
+        const key = channelKey(validated.channels[ch], validated.stepBasis, roundness);
         const cached = channelCacheRef.current[ch];
 
         if (cached && cached.key === key) {
@@ -79,7 +86,8 @@ export function useHalftoneCMYK(
 
         const result = computeHalftoneCMYKChannel(
           cache.pixels, cache.workWidth, cache.workHeight, cache.scale,
-          ch, validated.channels[ch], validated.stepBasis
+          ch, validated.channels[ch], validated.stepBasis,
+          validated.shape, validated.cornerRadius
         );
         channelCacheRef.current[ch] = { key, result };
         channels[ch] = result;
@@ -87,13 +95,15 @@ export function useHalftoneCMYK(
 
       return { channels, naturalWidth, naturalHeight };
     },
-    // `shape` and `cornerRadius` are deliberately absent: computeHalftoneCMYK
-    // produces circle data only and never reads them (the canvas applies them
-    // at draw time), so including them would recompute all four channels on a
-    // shape change.
+    // `shape` and `cornerRadius` are here because dots are sized so every
+    // shape covers the same area for the same ink — a square needs a smaller
+    // half-size than a circle. The per-channel key above skips the recompute
+    // when the change can't affect sizes.
     [
       config.step,
       config.density,
+      config.shape,
+      config.cornerRadius,
       config.stepBasis,
       JSON.stringify(config.channels),
     ]

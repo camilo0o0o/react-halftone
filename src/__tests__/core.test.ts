@@ -14,7 +14,7 @@ import {
 describe('validateConfig', () => {
   it('returns defaults when called with {}', () => {
     const config = validateConfig({});
-    expect(config).toEqual({ step: 10, density: 80, color: '#000000', invert: false, shape: 'circle', cornerRadius: 0, stepBasis: 'min' });
+    expect(config).toEqual({ step: 10, density: 100, color: '#000000', invert: false, shape: 'circle', cornerRadius: 0, stepBasis: 'min' });
   });
 
   it('clamps step below 0.1', () => {
